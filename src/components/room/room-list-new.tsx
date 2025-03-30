@@ -474,7 +474,7 @@ const RoomList = () => {
                                 e.stopPropagation();
                                 handleRoomClick(room);
                               }}
-                              sx={{
+                              sx={room.maxPlayer !== room.playerCount ? {
                                 background:
                                   "linear-gradient(45deg, rgb(106, 61, 232) 30%, rgb(158, 127, 249) 90%)",
                                 color: "white",
@@ -484,7 +484,8 @@ const RoomList = () => {
                                   background:
                                     "linear-gradient(45deg, rgb(106, 61, 232) 10%, rgb(158, 127, 249) 100%)",
                                 },
-                              }}
+                              } : {}}
+                              disabled={room.maxPlayer === room.playerCount}
                             >
                               Tham gia
                             </Button>
