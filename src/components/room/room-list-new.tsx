@@ -265,89 +265,110 @@ const RoomList = () => {
               // Mobile view - Card list
               <Box sx={{ mb: 3 }}>
                 {paginatedRooms.length > 0 ? (
-                  paginatedRooms.map((room) => (
-                    <Card
-                      key={room.roomId}
-                      sx={{
-                        mb: 2,
-                        borderRadius: 2,
-                        cursor: "pointer",
-                        transition: "transform 0.2s",
-                        "&:hover": {
-                          transform: "translateY(-4px)",
-                          boxShadow: 4,
-                        },
-                      }}
-                      onClick={() => handleRoomClick(room)}
-                    >
-                      <CardContent sx={{ p: 2 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mb: 1,
-                          }}
-                        >
-                          <Typography
-                            variant="h6"
-                            noWrap
-                            sx={{ maxWidth: "70%" }}
-                          >
-                            {room.roomName}
-                          </Typography>
-                          {/* <Chip
-                            size="small"
-                            label={getStatusText(room.status)}
-                            color={getStatusColor(room.status)}
-                          /> */}
-                        </Box>
+                  paginatedRooms.map((room) => {
+                    const isFull = room.playerCount === room.maxPlayer;
 
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            mb: 1,
-                          }}
-                        >
-                          <Box sx={{ display: "flex", alignItems: "center" }}>
-                            <IoMdPeople className="mr-1 text-base" />
-                            <Typography className="text-base">
-                              {room.playerCount}/{room.maxPlayer}
+                    return (
+                      <Card
+                        key={room.roomId}
+                        sx={{
+                          mb: 2,
+                          borderRadius: 2,
+                          cursor: isFull ? "default" : "pointer",
+                          opacity: isFull ? 0.6 : 1,
+                          position: "relative", // Cho lớp phủ
+                          transition: "transform 0.2s",
+                          "&:hover": {
+                            transform: "translateY(-4px)",
+                            boxShadow: 4,
+                          },
+                        }}
+                        onClick={() => !isFull && handleRoomClick(room)}
+                      >
+                        <CardContent sx={{ p: 2 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              mb: 1,
+                            }}
+                          >
+                            <Typography
+                              variant="h6"
+                              noWrap
+                              sx={{ maxWidth: "70%" }}
+                            >
+                              {room.roomName}
                             </Typography>
                           </Box>
-                          <Box>
-                            {room.hasPassword ? (
-                              <Tooltip title="Có mật khẩu">
+
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              mb: 1,
+                            }}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center" }}>
+                              <IoMdPeople className="mr-1 text-base" />
+                              <Typography className="text-base">
+                                {room.playerCount}/{room.maxPlayer}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              {room.hasPassword ? (
                                 <MdLock className="text-base" />
-                              </Tooltip>
-                            ) : (
-                              <Tooltip title="Không mật khẩu">
+                              ) : (
                                 <MdLockOpen className="text-emerald-600 text-base" />
-                              </Tooltip>
-                            )}
+                              )}
+                            </Box>
                           </Box>
-                        </Box>
 
-                        <Divider sx={{ my: 1 }} />
+                          <Divider sx={{ my: 1 }} />
 
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Typography variant="body2" color="text.secondary">
-                            Chủ phòng: {room.hostName}
-                          </Typography>
-                          {/* <Typography variant="body2" color="text.secondary">
-                            {formatDate(room.createdAt, "dd/MM/yyyy HH:mm")}
-                          </Typography> */}
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Typography variant="body2" color="text.secondary">
+                              Chủ phòng: {room.hostName}
+                            </Typography>
+                          </Box>
+                        </CardContent>
+
+                        {/* Thêm lớp phủ với nội dung "Phòng đã đầy" */}
+                        {isFull && (
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              width: "100%",
+                              height: "100%",
+                              backgroundColor: "rgba(255, 255, 255, 0.8)",
+                              borderRadius: 2,
+                              display: "flex",
+                              justifyContent: "center",
+                              alignItems: "center",
+                              zIndex: 1,
+                            }}
+                          >
+                            <Typography
+                              variant="body1"
+                              color="error"
+                              sx={{ fontWeight: "bold" }}
+                            >
+                              Phòng đã đủ người
+                            </Typography>
+                          </Box>
+                        )}
+                      </Card>
+                    );
+                  })
                 ) : (
                   <Paper
                     sx={{
@@ -474,17 +495,21 @@ const RoomList = () => {
                                 e.stopPropagation();
                                 handleRoomClick(room);
                               }}
-                              sx={room.maxPlayer !== room.playerCount ? {
-                                background:
-                                  "linear-gradient(45deg, rgb(106, 61, 232) 30%, rgb(158, 127, 249) 90%)",
-                                color: "white",
-                                boxShadow:
-                                  "0 3px 5px 2px rgba(106, 61, 232, 0.3)",
-                                "&:hover": {
-                                  background:
-                                    "linear-gradient(45deg, rgb(106, 61, 232) 10%, rgb(158, 127, 249) 100%)",
-                                },
-                              } : {}}
+                              sx={
+                                room.maxPlayer !== room.playerCount
+                                  ? {
+                                      background:
+                                        "linear-gradient(45deg, rgb(106, 61, 232) 30%, rgb(158, 127, 249) 90%)",
+                                      color: "white",
+                                      boxShadow:
+                                        "0 3px 5px 2px rgba(106, 61, 232, 0.3)",
+                                      "&:hover": {
+                                        background:
+                                          "linear-gradient(45deg, rgb(106, 61, 232) 10%, rgb(158, 127, 249) 100%)",
+                                      },
+                                    }
+                                  : {}
+                              }
                               disabled={room.maxPlayer === room.playerCount}
                             >
                               Tham gia
