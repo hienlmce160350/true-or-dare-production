@@ -6,7 +6,7 @@ import { useCallback, useState } from "react";
 import { LuHistory, LuRefreshCw } from "react-icons/lu";
 import { format } from "date-fns";
 import { FaTimes } from "react-icons/fa";
-import { IoHomeOutline } from "react-icons/io5";
+// import { IoHomeOutline } from "react-icons/io5";
 import { QuestionModeEnum } from "@/types/question/question-mode-enum";
 import { useGetquestionListQuery } from "@/api/question";
 import { QuestionTypeEnum } from "@/types/question/question-type-enum";
@@ -16,7 +16,7 @@ import { Player } from "@/types/player/player";
 interface GameScreenProps {
   mode: QuestionModeEnum;
   players: Player[];
-  onBack: () => void;
+  // onBack: () => void;
 }
 
 // Định nghĩa kiểu dữ liệu cho lịch sử câu hỏi
@@ -26,7 +26,7 @@ interface QuestionHistory {
   questionText: string;
   timestamp: Date;
 }
-export default function GameScreen({ mode, players, onBack }: GameScreenProps) {
+export default function GameScreen({ mode, players }: GameScreenProps) {
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [questionType, setQuestionType] = useState<QuestionTypeEnum | null>(
     null
@@ -160,11 +160,11 @@ export default function GameScreen({ mode, players, onBack }: GameScreenProps) {
   };
 
   return (
-    <Card className="w-full max-w-md bg-white p-3 shadow-lg relative">
-      <div className="flex items-center justify-between">
-        <IconButton onClick={onBack} className="!text-black">
+    <Card className="w-full max-w-auto bg-white p-3 shadow-lg relative">
+      <div className="flex items-center justify-end">
+        {/* <IconButton onClick={onBack} className="!text-black">
           <IoHomeOutline className="h-5 w-5" />
-        </IconButton>
+        </IconButton> */}
         <div className="flex items-center gap-2">
           {/* Thêm nút hiển thị lịch sử */}
           <Button
@@ -258,7 +258,7 @@ export default function GameScreen({ mode, players, onBack }: GameScreenProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-6 p-6"
+              className="space-y-6 p-2 md:p-6"
             >
               <motion.div
                 className="rounded-lg bg-gray-100 p-4 text-center"

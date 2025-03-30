@@ -20,8 +20,8 @@ type GameMode = "menu" | "friends" | "couples" | "party" | "game" | "special";
 
 type Props = {
   players: Player[];
-}
-const TruthOrDareGame = ({players}: Props) => {
+};
+const TruthOrDareGame = ({ players }: Props) => {
   const [currentScreen, setCurrentScreen] = useState<GameMode>("menu");
   // const [players, setPlayers] = useState<Player[]>([]);
   const [currentMode, setCurrentMode] = useState<QuestionModeEnum>(
@@ -58,7 +58,9 @@ const TruthOrDareGame = ({players}: Props) => {
     }
 
     if (currentScreen === "party") {
-      return <PartySetup onStart={startGame} onBack={backToMenu} players={players}/>;
+      return (
+        <PartySetup onStart={startGame} onBack={backToMenu} players={players} />
+      );
     }
 
     if (currentScreen === "special") {
@@ -66,9 +68,7 @@ const TruthOrDareGame = ({players}: Props) => {
     }
 
     if (currentScreen === "game") {
-      return (
-        <GameScreen mode={currentMode} players={players} onBack={backToMenu} />
-      );
+      return <GameScreen mode={currentMode} players={players} />;
     }
 
     if (currentScreen === "menu") {

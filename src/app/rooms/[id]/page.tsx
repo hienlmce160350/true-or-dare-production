@@ -37,10 +37,12 @@ import {
   MdPlayArrow,
   MdStars,
 } from "react-icons/md";
-import TruthOrDareGame from "../../../components/menu/page";
+// import TruthOrDareGame from "../../../components/menu/page";
 import { Player } from "@/types/player/player";
 import ChangePlayerNameDialog from "@/components/room/dialog/change-player-name-dialog";
 import LeaveRoomDialog from "@/components/room/dialog/exit-room-dialog";
+import GameScreen from "@/components/game/page";
+import { QuestionModeEnum } from "@/types/question/question-mode-enum";
 
 type RequestChangePlayerName = {
   playerId?: string;
@@ -97,6 +99,7 @@ const RoomPage = () => {
 
   const handleCloseChangeNameDialog = useCallback(() => {
     setChangeNameDialogOpen(false);
+    handleClosePlayerMenu();
   }, []);
 
   const handleOpenExitRoomDialog = useCallback(() => {
@@ -365,8 +368,10 @@ const RoomPage = () => {
                 //     )}
                 //   </Box>
                 // </Box>
-
-                <TruthOrDareGame players={room?.players} />
+                <GameScreen
+                  mode={QuestionModeEnum.Party}
+                  players={room?.players}
+                />
               )}
             </Paper>
           </Box>

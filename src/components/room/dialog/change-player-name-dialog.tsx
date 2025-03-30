@@ -170,7 +170,7 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
                 {shouldRefetch && (
                   <CircularProgress color="inherit" className="!h-5 !w-5" />
                 )}
-                Tạo
+                Đổi tên
               </Button>
             </div>
           </FormProvider>

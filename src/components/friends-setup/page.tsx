@@ -1,4 +1,3 @@
-import { Player } from "@/types/player/player";
 import {
   Button,
   Card,
@@ -12,7 +11,7 @@ import { useMemo, useState } from "react";
 import { LuCircleArrowLeft } from "react-icons/lu";
 
 interface FriendsSetupProps {
-  onStart: (players: Player[]) => void;
+  onStart: (players: string[]) => void;
   onBack: () => void;
 }
 
