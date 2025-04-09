@@ -230,7 +230,7 @@ const RoomPage = () => {
   };
 
   return (
-    <Container maxWidth="md">
+    <Container maxWidth="lg">
       {roomLoading ? (
         <Box
           sx={{
