@@ -41,6 +41,7 @@ import {
 import CreateRoomDialog from "./dialog/create-room-dialog";
 import JoinRoomDialog from "./dialog/join-room-dialog";
 import Iconify from "../iconify";
+import { RoomStatusEnum } from "@/types/room/room-status-enum";
 
 const RoomList = () => {
   const router = useRouter();
@@ -496,7 +497,9 @@ const RoomList = () => {
                                 handleRoomClick(room);
                               }}
                               sx={
-                                room.maxPlayer !== room.playerCount
+                                room.maxPlayer !== room.playerCount &&
+                                room.status !== RoomStatusEnum.Playing &&
+                                room.status !== RoomStatusEnum.Ended
                                   ? {
                                       background:
                                         "linear-gradient(45deg, rgb(106, 61, 232) 30%, rgb(158, 127, 249) 90%)",
@@ -510,7 +513,11 @@ const RoomList = () => {
                                     }
                                   : {}
                               }
-                              disabled={room.maxPlayer === room.playerCount}
+                              disabled={
+                                room.maxPlayer === room.playerCount ||
+                                room.status === RoomStatusEnum.Playing ||
+                                room.status === RoomStatusEnum.Ended
+                              }
                             >
                               Tham gia
                             </Button>
