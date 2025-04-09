@@ -21,20 +21,33 @@ export const poster = async (
   data: unknown,
   config?: AxiosRequestConfig
 ) => {
-  const res = await axiosInstance.post(url, data, { ...config });
-
-  return res;
+  try {
+    const res = await axiosInstance.post(url, data, { ...config });
+    return res;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      // Forward the error response data
+      throw error.response.data;
+    }
+    throw error; // Re-throw if it's not an Axios error or doesn't have response
+  }
 };
 
-// For patching data
 export const patcher = async (
   url: string,
   data: unknown,
   config?: AxiosRequestConfig
 ) => {
-  const res = await axiosInstance.patch(url, data, { ...config });
-
-  return res;
+  try {
+    const res = await axiosInstance.patch(url, data, { ...config });
+    return res;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      // Forward the error response data
+      throw error.response.data;
+    }
+    throw error; // Re-throw if it's not an Axios error or doesn't have response
+  }
 };
 
 // For deleting data
@@ -60,9 +73,13 @@ export const endpoints = {
   room: {
     list: "/api/rooms/list",
     create: "/api/rooms/create",
-    join: (id: Room['roomId']) => `/api/rooms/${id}/join`,
-    leave: (id: Room['roomId']) => `/api/rooms/${id}/leave-room`,
-    detail: (id: Room['roomId']) => `/api/rooms/${id}`,
-    changePlayerName: (id: Room['roomId']) => `/api/rooms/${id}/change-name`,
+    join: (id: Room["roomId"]) => `/api/rooms/${id}/join`,
+    leave: (id: Room["roomId"]) => `/api/rooms/${id}/leave-room`,
+    detail: (id: Room["roomId"]) => `/api/rooms/${id}`,
+    changePlayerName: (id: Room["roomId"]) => `/api/rooms/${id}/change-name`,
+    start: (id: Room["roomId"]) => `/api/rooms/${id}/start`,
+    reset: (id: Room["roomId"]) => `/api/rooms/${id}/reset-game`,
+    getQuestion: (id: Room["roomId"]) => `/api/rooms/${id}/get-question`,
+    nextPlayer: (id: Room["roomId"]) => `/api/rooms/${id}/next-player`,
   },
 };

@@ -1,3 +1,4 @@
+import { CommonAPIErrors, RoomErrors } from "@/api/common/types/common-errors";
 import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
 import { useJoinRoomPostMutation } from "@/api/rooms";
 import FormProvider from "@/components/hook-form/form-provider";
@@ -54,7 +55,7 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
     resolver: yupResolver(JoinRoomSchema),
   });
 
-  const { handleSubmit } = methods;
+  const { handleSubmit, setError } = methods;
 
   const onSubmit = handleSubmit(async (dataSubmit) => {
     try {
@@ -82,11 +83,23 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
         router.push(`/rooms/${data?.roomId}`);
       }
     } catch (error) {
-      console.error(error);
-      enqueueSnackbar({
-        message: "Vào phòng thất bại",
-        variant: "error",
-      });
+      const customError = error as CommonAPIErrors;
+      if (customError?.errors?.errorCode === RoomErrors.RoomPasswordIsWrong) {
+        setError("roomPassword", {
+          type: "manual",
+          message: "Mật khẩu không đúng",
+        });
+        enqueueSnackbar({
+          message: "Mật khẩu không đúng",
+          variant: "error",
+        });
+      } else {
+        enqueueSnackbar({
+          message: "Vào phòng thất bại",
+          variant: "error",
+        });
+      }
+
       setShouldRefetch(false);
     }
   });

@@ -38,6 +38,10 @@ function LeaveRoomDialog({ open, onClose, requestData }: Props) {
         playerId: requestData?.playerId,
       };
       leaveRoom(roomInfo);
+      enqueueSnackbar({
+        message: "Rời phòng thành công",
+        variant: "success",
+      });
       router.push("/rooms");
     } catch (error) {
       console.error(error);

@@ -1,6 +1,10 @@
 "use client";
 
-import { useGetRoomByIdReactQuery } from "@/api/rooms";
+import {
+  useGetRoomByIdReactQuery,
+  useResetGamePatchMutation,
+  useStartGamePatchMutation,
+} from "@/api/rooms";
 import { getStorage } from "@/hooks/use-local-storage";
 import {
   Alert,
@@ -19,7 +23,6 @@ import {
   List,
   ListItem,
   ListItemAvatar,
-  ListItemText,
   Menu,
   MenuItem,
   Paper,
@@ -42,7 +45,9 @@ import { Player } from "@/types/player/player";
 import ChangePlayerNameDialog from "@/components/room/dialog/change-player-name-dialog";
 import LeaveRoomDialog from "@/components/room/dialog/exit-room-dialog";
 import GameScreen from "@/components/game/page";
-import { QuestionModeEnum } from "@/types/question/question-mode-enum";
+import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
+import { enqueueSnackbar } from "notistack";
+import { CommonAPIErrors, RoomErrors } from "@/api/common/types/common-errors";
 
 type RequestChangePlayerName = {
   playerId?: string;
@@ -53,6 +58,7 @@ type RequestChangePlayerName = {
 const RoomPage = () => {
   const params = useParams();
   const roomId = params?.id;
+  // const router = useRouter();
   const [gameStarted, setGameStarted] = useState(false);
   // const [timeLeft, setTimeLeft] = useState(30);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
@@ -74,6 +80,10 @@ const RoomPage = () => {
       playerName: "",
     }
   );
+
+  const { startRoomAsync } = useStartGamePatchMutation(roomId as string);
+
+  const { resetRoomAsync } = useResetGamePatchMutation(roomId as string);
 
   const handlePlayerMenuClick = (
     event: React.MouseEvent<HTMLElement>,
@@ -152,18 +162,67 @@ const RoomPage = () => {
   //   };
   // }, [gameStarted, timeLeft, questionIndex, questions]);
 
-  const startGame = () => {
-    setGameStarted(true);
-    // setTimeLeft(30);
-    showSnackbar("Trò chơi bắt đầu!");
-  };
+  const startGame = useCallback(async () => {
+    try {
+      const { data, status } = await startRoomAsync({
+        playerId: playerState?.state?.playerId,
+      });
+      if (data?.message && status === HTTP_CODES_ENUM.OK) {
+        setGameStarted(true);
+        // setTimeLeft(30);
+        showSnackbar("Trò chơi bắt đầu!");
+      }
+    } catch (error) {
+      const customError = error as CommonAPIErrors;
+      if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
+        enqueueSnackbar({
+          variant: "error",
+          message: "Bạn không phải là chủ phòng",
+        });
+      } else if (
+        customError?.errors?.errorCode === RoomErrors.RoomStartStatusException
+      ) {
+        enqueueSnackbar({
+          variant: "error",
+          message: "Trò chơi đã bắt đầu",
+        });
+      } else {
+        enqueueSnackbar({
+          variant: "error",
+          message: "Không thể bắt đầu trò chơi",
+        });
+      }
+      console.error("Error starting game:", error);
+    }
+  }, [playerState?.state?.playerId, startRoomAsync]);
 
-  const continueGame = () => {
-    setGameEndDialogOpen(false);
-    // setTimeLeft(30);
-    setGameStarted(true);
-    showSnackbar("Bắt đầu lại trò chơi!");
-  };
+  const continueGame = useCallback(async () => {
+    try {
+      const { data, status } = await resetRoomAsync({
+        playerId: playerState?.state?.playerId,
+      });
+      if (data?.message && status === HTTP_CODES_ENUM.OK) {
+        setGameEndDialogOpen(false);
+        // setTimeLeft(30);
+        setGameStarted(false);
+        showSnackbar("Bắt đầu lại trò chơi!");
+      }
+    } catch (error) {
+      const customError = error as CommonAPIErrors;
+      if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
+        enqueueSnackbar({
+          variant: "error",
+          message: "Bạn không phải là chủ phòng",
+        });
+      } else {
+        enqueueSnackbar({
+          variant: "error",
+          message: "Không thể bắt đầu lại trò chơi",
+        });
+      }
+      console.error("Error reseting game:", error);
+    }
+  }, [playerState?.state?.playerId, resetRoomAsync]);
 
   const showSnackbar = (message: string) => {
     setSnackbarMessage(message);
@@ -193,11 +252,9 @@ const RoomPage = () => {
               mb: 3,
             }}
           >
-            <Typography variant="h4" component="h1" className="text-white">
-              Phòng: {roomId}
-            </Typography>
+            <Typography className="text-white">Phòng: {roomId}</Typography>
             <Button
-              className="!text-white !border-white"
+              className="!text-white !border-white flex-none"
               variant="outlined"
               color="inherit"
               startIcon={<MdExitToApp />}
@@ -231,6 +288,7 @@ const RoomPage = () => {
                 {room?.players?.map((player, index) => (
                   <Box key={player.playerId}>
                     <ListItem
+                      className="flex-wrap gap-2"
                       secondaryAction={
                         player.playerName === playerState.state.playerName && (
                           <Tooltip title="Tùy chọn">
@@ -245,27 +303,23 @@ const RoomPage = () => {
                         )
                       }
                     >
-                      <ListItemAvatar>
+                      <ListItemAvatar className="flex justify-center items-center gap-2">
+                        {player.playerName === playerState.state.playerName && (
+                          <Chip label="Bạn" size="small" color="primary" />
+                        )}
                         <Avatar className="player-avatar">
                           <MdPerson />
                         </Avatar>
                       </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: "flex", alignItems: "center" }}>
-                            {player.playerName}
-                            {player.playerName ===
-                              playerState.state.playerName && (
-                              <Chip
-                                label="Bạn"
-                                size="small"
-                                color="primary"
-                                sx={{ ml: 1 }}
-                              />
-                            )}
-                          </Box>
-                        }
-                      />
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {player.playerName}
+                      </Box>
                       {player.isHost && (
                         <IconButton edge="end" size="medium" color="warning">
                           <MdStars />
@@ -369,8 +423,10 @@ const RoomPage = () => {
                 //   </Box>
                 // </Box>
                 <GameScreen
-                  mode={QuestionModeEnum.Party}
+                  mode={room?.mode}
                   players={room?.players}
+                  roomId={roomId as string}
+                  setGameEndDialogOpen={setGameEndDialogOpen}
                 />
               )}
             </Paper>
@@ -401,13 +457,7 @@ const RoomPage = () => {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button
-            onClick={() => {
-              setGameEndDialogOpen(false);
-              setGameStarted(false);
-            }}
-            color="inherit"
-          >
+          <Button onClick={handleOpenExitRoomDialog} color="inherit">
             Kết thúc
           </Button>
           {checkHost && (

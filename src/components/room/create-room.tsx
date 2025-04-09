@@ -10,7 +10,9 @@ import {
   Button,
   CircularProgress,
   FormControl,
+  FormHelperText,
   IconButton,
+  MenuItem,
 } from "@mui/material";
 import RHFTextField from "../hook-form/rhf-text-field";
 import { useSnackbar } from "notistack";
@@ -19,6 +21,10 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
 import { setStorage } from "@/hooks/use-local-storage";
+import { QuestionModeEnum } from "@/types/question/question-mode-enum";
+import { RoomAgeGroupEnum } from "@/types/room/room-age-group-enum";
+import { RHFSelect } from "../hook-form/rhf-select";
+import { CommonAPIErrors, RoomErrors } from "@/api/common/types/common-errors";
 
 const CreateRoom = () => {
   const { enqueueSnackbar } = useSnackbar();
@@ -31,6 +37,8 @@ const CreateRoom = () => {
       playerName: "",
       roomPassword: "",
       maxPlayer: 2,
+      mode: QuestionModeEnum.Party,
+      ageGroup: RoomAgeGroupEnum.All,
     }),
     []
   );
@@ -42,6 +50,8 @@ const CreateRoom = () => {
     maxPlayer: Yup.number()
       .required("Số lượng người chơi tối đa không được để trống")
       .moreThan(0, "Số lượng người chơi tối đa phải lớn hơn 0"),
+    mode: Yup.string(),
+    ageGroup: Yup.string(),
   });
 
   const methods = useForm({
@@ -49,7 +59,11 @@ const CreateRoom = () => {
     resolver: yupResolver(CreateRoomSchema),
   });
 
-  const { handleSubmit } = methods;
+  const {
+    handleSubmit,
+    formState: { errors },
+    setError,
+  } = methods;
 
   const onSubmit = handleSubmit(async (dataSubmit) => {
     try {
@@ -59,6 +73,12 @@ const CreateRoom = () => {
         playerName: dataSubmit.playerName ? dataSubmit.playerName.trim() : "",
         roomPassword: dataSubmit.roomPassword ? dataSubmit.roomPassword : "",
         maxPlayer: dataSubmit.maxPlayer ? dataSubmit.maxPlayer : 2,
+        mode: dataSubmit.mode
+          ? (dataSubmit.mode as QuestionModeEnum)
+          : QuestionModeEnum.Party,
+        ageGroup: dataSubmit.ageGroup
+          ? (dataSubmit.ageGroup as RoomAgeGroupEnum)
+          : RoomAgeGroupEnum.All,
       };
       const { data, status } = await postRoomAsync(roomInfo);
       if (data.roomId && status === HTTP_CODES_ENUM.OK) {
@@ -77,14 +97,52 @@ const CreateRoom = () => {
         router.push(`/rooms/${data?.roomId}`);
       }
     } catch (error) {
+      const customError = error as CommonAPIErrors;
       console.error(error);
-      enqueueSnackbar({
-        message: "Tạo phòng thất bại",
-        variant: "error",
-      });
+      if (customError?.errors?.errorCode === RoomErrors.RoomAlreadyExists) {
+        setError("roomName", {
+          type: "manual",
+          message: "Tên phòng đã tồn tại",
+        });
+        enqueueSnackbar({
+          message: "Tên phòng đã tồn tại",
+          variant: "error",
+        });
+      } else {
+        enqueueSnackbar({
+          message: "Tạo phòng thất bại",
+          variant: "error",
+        });
+      }
       setShouldRefetch(false);
     }
   });
+
+  const memoizedModesMenuItems = useMemo(() => {
+    const MODE_OPTIONS = [
+      { label: "Bạn bè", value: QuestionModeEnum.Friends },
+      { label: "Cặp đôi", value: QuestionModeEnum.Couples },
+      { label: "Buổi tiệc", value: QuestionModeEnum.Party },
+    ];
+    return MODE_OPTIONS.map((option) => (
+      <MenuItem key={option.value} value={option.value}>
+        {`${option.label}`}
+      </MenuItem>
+    ));
+  }, []);
+
+  const memoizedAgeGroupMenuItems = useMemo(() => {
+    const MODE_OPTIONS = [
+      { label: "Trẻ em", value: RoomAgeGroupEnum.Kids },
+      { label: "Vị thành niên", value: RoomAgeGroupEnum.Teen },
+      { label: "Tất cả độ tuổi", value: RoomAgeGroupEnum.All },
+    ];
+    return MODE_OPTIONS.map((option) => (
+      <MenuItem key={option.value} value={option.value}>
+        {`${option.label}`}
+      </MenuItem>
+    ));
+  }, []);
 
   const sxFormControl = useMemo(
     () => ({
@@ -152,6 +210,26 @@ const CreateRoom = () => {
                 placeholder="Nhập tên"
                 variant="outlined"
               />
+            </FormControl>
+
+            <FormControl sx={sxFormControl}>
+              <RHFSelect name="mode" label="Chế độ">
+                {memoizedModesMenuItems}
+                {errors.mode && (
+                  <FormHelperText error>{errors.mode.message}</FormHelperText>
+                )}
+              </RHFSelect>
+            </FormControl>
+
+            <FormControl sx={sxFormControl}>
+              <RHFSelect name="ageGroup" label="Độ tuổi">
+                {memoizedAgeGroupMenuItems}
+                {errors.ageGroup && (
+                  <FormHelperText error>
+                    {errors.ageGroup.message}
+                  </FormHelperText>
+                )}
+              </RHFSelect>
             </FormControl>
 
             <FormControl sx={sxFormControl}>

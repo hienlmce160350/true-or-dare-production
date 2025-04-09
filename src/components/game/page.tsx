@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { Badge, Button, Card, CardContent, IconButton } from "@mui/material";
 import { AnimatePresence, motion } from "framer-motion";
@@ -8,15 +8,22 @@ import { format } from "date-fns";
 import { FaTimes } from "react-icons/fa";
 // import { IoHomeOutline } from "react-icons/io5";
 import { QuestionModeEnum } from "@/types/question/question-mode-enum";
-import { useGetquestionListQuery } from "@/api/question";
+// import { useGetquestionListQuery } from "@/api/question";
 import { QuestionTypeEnum } from "@/types/question/question-type-enum";
 import { Question } from "@/types/question/question";
 import { Player } from "@/types/player/player";
+import {
+  useGetQuestionPatchMutation,
+  useNextPlayerPatchMutation,
+} from "@/api/rooms";
+import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
 
 interface GameScreenProps {
   mode: QuestionModeEnum;
   players: Player[];
   // onBack: () => void;
+  roomId?: string;
+  setGameEndDialogOpen: (open: boolean) => void;
 }
 
 // Định nghĩa kiểu dữ liệu cho lịch sử câu hỏi
@@ -26,35 +33,41 @@ interface QuestionHistory {
   questionText: string;
   timestamp: Date;
 }
-export default function GameScreen({ mode, players }: GameScreenProps) {
+export default function GameScreen({
+  mode,
+  players,
+  roomId,
+  setGameEndDialogOpen,
+}: GameScreenProps) {
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [questionType, setQuestionType] = useState<QuestionTypeEnum | null>(
     null
   );
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [usedQuestions, setUsedQuestions] = useState<Set<Question>>(new Set());
+  // const [usedQuestions, setUsedQuestions] = useState<Set<Question>>(new Set());
+  const [isLastQuestion, setIsLastQuestion] = useState(false);
 
-  const { questions } = useGetquestionListQuery({
-    filter: {
-      mode: mode,
-      type: "",
-      difficulty: "",
-      age_group: "",
-    }
-  });
+  // const { questions } = useGetquestionListQuery({
+  //   filter: {
+  //     mode: mode,
+  //     type: "",
+  //     difficulty: "",
+  //     age_group: "",
+  //   },
+  // });
 
-  const questionsWithFriendsMode = questions?.filter(
-    (question) => question.mode === QuestionModeEnum.Friends
-  );
-  const questionsWithCouplesMode = questions?.filter(
-    (question) => question.mode === QuestionModeEnum.Couples
-  );
-  const questionsWithPartyMode = questions?.filter(
-    (question) => question.mode === QuestionModeEnum.Party
-  );
-  const questionsWithSpecialMode = questions?.filter(
-    (question) => question.mode === QuestionModeEnum.Special
-  );
+  // const questionsWithFriendsMode = questions?.filter(
+  //   (question) => question.mode === QuestionModeEnum.Friends
+  // );
+  // const questionsWithCouplesMode = questions?.filter(
+  //   (question) => question.mode === QuestionModeEnum.Couples
+  // );
+  // const questionsWithPartyMode = questions?.filter(
+  //   (question) => question.mode === QuestionModeEnum.Party
+  // );
+  // const questionsWithSpecialMode = questions?.filter(
+  //   (question) => question.mode === QuestionModeEnum.Special
+  // );
 
   const [isRevealing, setIsRevealing] = useState(false);
 
@@ -63,51 +76,73 @@ export default function GameScreen({ mode, players }: GameScreenProps) {
   // Thêm state để hiển thị/ẩn panel lịch sử
   const [showHistory, setShowHistory] = useState(false);
 
-  const getQuestions = () => {
-    switch (mode) {
-      case QuestionModeEnum.Friends:
-        return questionsWithFriendsMode;
-      case QuestionModeEnum.Couples:
-        return questionsWithCouplesMode;
-      case QuestionModeEnum.Party:
-        return questionsWithPartyMode;
-      case QuestionModeEnum.Special:
-        return questionsWithSpecialMode;
-    }
-  };
+  // const getQuestions = () => {
+  //   switch (mode) {
+  //     case QuestionModeEnum.Friends:
+  //       return questionsWithFriendsMode;
+  //     case QuestionModeEnum.Couples:
+  //       return questionsWithCouplesMode;
+  //     case QuestionModeEnum.Party:
+  //       return questionsWithPartyMode;
+  //     case QuestionModeEnum.Special:
+  //       return questionsWithSpecialMode;
+  //   }
+  // };
 
-  const getRandomQuestion = (type: QuestionTypeEnum) => {
-    const questions = getQuestions().filter(
-      (question) => question.type === type
-    );
+  // const getRandomQuestion = (type: QuestionTypeEnum) => {
+  //   const questions = getQuestions().filter(
+  //     (question) => question.type === type
+  //   );
 
-    const availableQuestions = questions?.filter((q) => !usedQuestions.has(q));
+  //   const availableQuestions = questions?.filter((q) => !usedQuestions.has(q));
 
-    // If we've used all questions, reset the used questions
-    if (availableQuestions.length === 0) {
-      setUsedQuestions(new Set());
-      return questions[Math.floor(Math.random() * questions.length)];
-    }
+  //   // If we've used all questions, reset the used questions
+  //   if (availableQuestions.length === 0) {
+  //     setUsedQuestions(new Set());
+  //     return questions[Math.floor(Math.random() * questions.length)];
+  //   }
 
-    const randomQuestion =
-      availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
-    setUsedQuestions(new Set([...usedQuestions, randomQuestion]));
-    return randomQuestion;
-  };
+  //   const randomQuestion =
+  //     availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+  //   setUsedQuestions(new Set([...usedQuestions, randomQuestion]));
+  //   return randomQuestion;
+  // };
 
-  const selectQuestionType = (type: QuestionTypeEnum) => {
+  const { getQuestionRoomAsync } = useGetQuestionPatchMutation(
+    roomId as string
+  );
+
+  const selectQuestionType = async (type: QuestionTypeEnum) => {
     setQuestionType(type);
     setIsRevealing(true);
-    setTimeout(() => {
-      const question = getRandomQuestion(type);
-      setCurrentQuestion(question);
-      setIsRevealing(false);
-    }, 1000);
+    try {
+      const { data, status } = await getQuestionRoomAsync({
+        playerId: players[currentPlayerIndex].playerId,
+        questionType: type,
+      });
+      if (status === HTTP_CODES_ENUM.OK) {
+        setCurrentQuestion(data.question);
+        setIsRevealing(false);
+        setIsLastQuestion(data.isLastQuestion);
+        if (data?.isGameEnded) {
+          setGameEndDialogOpen(true);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching question:", error);
+    }
+
+    // setTimeout(() => {
+    //   const question = getRandomQuestion(type);
+    //   setCurrentQuestion(question);
+    //   setIsRevealing(false);
+    // }, 1000);
 
     // Add a small delay before showing the question for a reveal effect
   };
 
-  const nextTurn = () => {
+  const { nextPlayerRoomAsync } = useNextPlayerPatchMutation(roomId as string);
+  const nextTurn = async () => {
     // Lưu câu hỏi hiện tại vào lịch sử trước khi chuyển lượt
     if (questionType && currentQuestion) {
       const historyItem: QuestionHistory = {
@@ -120,9 +155,48 @@ export default function GameScreen({ mode, players }: GameScreenProps) {
       setQuestionHistory((prev) => [...prev, historyItem]);
     }
 
-    setQuestionType(null);
-    setCurrentQuestion(null);
-    setCurrentPlayerIndex((currentPlayerIndex + 1) % players.length);
+    try {
+      const { data, status } = await nextPlayerRoomAsync({
+        playerId: players[currentPlayerIndex].playerId,
+      });
+      if (status === HTTP_CODES_ENUM.OK) {
+        setQuestionType(null);
+        setCurrentQuestion(null);
+        const playerIndex = players.findIndex(
+          (player) => player.playerId === data.nextPlayerId
+        );
+        setCurrentPlayerIndex(playerIndex);
+      }
+    } catch (error) {
+      console.error("Error next player:", error);
+    }
+  };
+
+  const lastTurn = async () => {
+    // Lưu câu hỏi hiện tại vào lịch sử trước khi chuyển lượt
+    if (questionType && currentQuestion) {
+      const historyItem: QuestionHistory = {
+        playerName: players[currentPlayerIndex].playerName,
+        questionType: questionType,
+        questionText: currentQuestion.text,
+        timestamp: new Date(),
+      };
+
+      setQuestionHistory((prev) => [...prev, historyItem]);
+    }
+
+    try {
+      const { data, status } = await nextPlayerRoomAsync({
+        playerId: players[currentPlayerIndex].playerId,
+      });
+      if (status === HTTP_CODES_ENUM.OK) {
+        if (data.isGameEnded) {
+          setGameEndDialogOpen(true);
+        }
+      }
+    } catch (error) {
+      console.error("Error next player:", error);
+    }
   };
 
   const toggleHistory = () => {
@@ -251,7 +325,7 @@ export default function GameScreen({ mode, players }: GameScreenProps) {
                   Thách
                 </Button>
               </motion.div>
-            </motion.div> 
+            </motion.div>
           ) : (
             <motion.div
               key="question"
@@ -334,23 +408,43 @@ export default function GameScreen({ mode, players }: GameScreenProps) {
                 )}
               </AnimatePresence>
 
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <Button
-                  className={`w-full !text-white ${
-                    questionType === "truth"
-                      ? "!bg-blue-600 hover:!bg-blue-700"
-                      : "!bg-purple-600 hover:!bg-purple-700"
-                  }`}
-                  onClick={nextTurn}
-                  disabled={isRevealing}
+              {isLastQuestion ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
                 >
-                  Lượt tiếp theo
-                </Button>
-              </motion.div>
+                  <Button
+                    className={`w-full !text-white ${
+                      questionType === "truth"
+                        ? "!bg-blue-600 hover:!bg-blue-700"
+                        : "!bg-purple-600 hover:!bg-purple-700"
+                    }`}
+                    onClick={lastTurn}
+                    disabled={isRevealing}
+                  >
+                    Lượt cuối cùng
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  <Button
+                    className={`w-full !text-white ${
+                      questionType === "truth"
+                        ? "!bg-blue-600 hover:!bg-blue-700"
+                        : "!bg-purple-600 hover:!bg-purple-700"
+                    }`}
+                    onClick={nextTurn}
+                    disabled={isRevealing}
+                  >
+                    Lượt tiếp theo
+                  </Button>
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

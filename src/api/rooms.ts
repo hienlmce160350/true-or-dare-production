@@ -1,11 +1,13 @@
 import { HOST_API } from "@/config-global";
+import { QuestionModeEnum } from "@/types/question/question-mode-enum";
+import { QuestionTypeEnum } from "@/types/question/question-type-enum";
 import { FilterRoomRequest, Room } from "@/types/room/room";
+import { RoomAgeGroupEnum } from "@/types/room/room-age-group-enum";
 import { endpoints, fetcher, patcher, poster } from "@/utils/axios";
 import { buildURL } from "@/utils/build-url";
 import { createQueryKeys } from "@/utils/react-query/query-key-factory";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
-
 const roomQueryKeys = createQueryKeys(["rooms"], {
   list: (request: FilterRoomRequest) => ({
     key: [request],
@@ -24,6 +26,12 @@ const roomQueryKeys = createQueryKeys(["rooms"], {
     key: [request],
   }),
   changePlayerName: (request: Room["roomId"]) => ({
+    key: [request],
+  }),
+  getQuestion: (request: Room["roomId"]) => ({
+    key: [request],
+  }),
+  nextPlayer: (request: Room["roomId"]) => ({
     key: [request],
   }),
 });
@@ -61,6 +69,8 @@ export type PostRoomRequest = {
   playerName?: string;
   roomPassword?: string;
   maxPlayer: number;
+  mode: QuestionModeEnum;
+  ageGroup: RoomAgeGroupEnum;
 };
 
 export function useRoomPostMutation() {
@@ -222,6 +232,139 @@ export function useChangePlayerNamePostMutation(roomId: Room["roomId"]) {
       changePlayerNameSuccess: isSuccess,
       changePlayerNamePending: isPending,
       changePlayerNameReset: reset,
+    }),
+    [error, isPending, isSuccess, mutate, mutateAsync, reset]
+  );
+  return memoizedValue;
+}
+
+// Start the game
+export type StartGamePatchRoomRequest = {
+  playerId?: string;
+};
+
+export function useStartGamePatchMutation(roomId: Room["roomId"]) {
+  const queryClient = useQueryClient();
+
+  const url = useMemo(() => `${endpoints.room.start(roomId)}`, [roomId]);
+
+  const { mutate, mutateAsync, error, isSuccess, isPending, reset } =
+    useMutation({
+      // Adjusted to use the `create` key for the mutation
+      mutationKey: roomQueryKeys.leave(roomId).key,
+      mutationFn: (request: StartGamePatchRoomRequest) =>
+        patcher(url, { ...request }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: roomQueryKeys.detail(roomId).key,
+        });
+      },
+    });
+
+  const memoizedValue = useMemo(
+    () => ({
+      startRoom: mutate,
+      startRoomAsync: mutateAsync,
+      startRoomError: error,
+      startRoomSuccess: isSuccess,
+      startRoomPending: isPending,
+      startRoomReset: reset,
+    }),
+    [error, isPending, isSuccess, mutate, mutateAsync, reset]
+  );
+  return memoizedValue;
+}
+
+// Reset the game
+export type ResetGamePatchRoomRequest = {
+  playerId?: string;
+};
+
+export function useResetGamePatchMutation(roomId: Room["roomId"]) {
+  const queryClient = useQueryClient();
+
+  const url = useMemo(() => `${endpoints.room.reset(roomId)}`, [roomId]);
+
+  const { mutate, mutateAsync, error, isSuccess, isPending, reset } =
+    useMutation({
+      // Adjusted to use the `create` key for the mutation
+      mutationKey: roomQueryKeys.leave(roomId).key,
+      mutationFn: (request: ResetGamePatchRoomRequest) =>
+        patcher(url, { ...request }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: roomQueryKeys.detail(roomId).key,
+        });
+      },
+    });
+
+  const memoizedValue = useMemo(
+    () => ({
+      resetRoom: mutate,
+      resetRoomAsync: mutateAsync,
+      resetRoomError: error,
+      resetRoomSuccess: isSuccess,
+      resetRoomPending: isPending,
+      resetRoomReset: reset,
+    }),
+    [error, isPending, isSuccess, mutate, mutateAsync, reset]
+  );
+  return memoizedValue;
+}
+
+export type GetQuestionPatchRoomRequest = {
+  playerId?: string;
+  questionType: QuestionTypeEnum;
+};
+
+export function useGetQuestionPatchMutation(roomId: Room["roomId"]) {
+  const url = useMemo(() => `${endpoints.room.getQuestion(roomId)}`, [roomId]);
+
+  const { mutate, mutateAsync, error, isSuccess, isPending, reset } =
+    useMutation({
+      // Adjusted to use the `create` key for the mutation
+      mutationKey: roomQueryKeys.getQuestion(roomId).key,
+      mutationFn: (request: GetQuestionPatchRoomRequest) =>
+        patcher(url, { ...request }),
+    });
+
+  const memoizedValue = useMemo(
+    () => ({
+      getQuestionRoom: mutate,
+      getQuestionRoomAsync: mutateAsync,
+      getQuestionRoomError: error,
+      getQuestionRoomSuccess: isSuccess,
+      getQuestionRoomPending: isPending,
+      getQuestionRoomReset: reset,
+    }),
+    [error, isPending, isSuccess, mutate, mutateAsync, reset]
+  );
+  return memoizedValue;
+}
+
+export type NextPlayerPatchRoomRequest = {
+  playerId?: string;
+};
+
+export function useNextPlayerPatchMutation(roomId: Room["roomId"]) {
+  const url = useMemo(() => `${endpoints.room.nextPlayer(roomId)}`, [roomId]);
+
+  const { mutate, mutateAsync, error, isSuccess, isPending, reset } =
+    useMutation({
+      // Adjusted to use the `create` key for the mutation
+      mutationKey: roomQueryKeys.nextPlayer(roomId).key,
+      mutationFn: (request: NextPlayerPatchRoomRequest) =>
+        patcher(url, { ...request }),
+    });
+
+  const memoizedValue = useMemo(
+    () => ({
+      nextPlayerRoom: mutate,
+      nextPlayerRoomAsync: mutateAsync,
+      nextPlayerRoomError: error,
+      nextPlayerRoomSuccess: isSuccess,
+      nextPlayerRoomPending: isPending,
+      nextPlayerRoomReset: reset,
     }),
     [error, isPending, isSuccess, mutate, mutateAsync, reset]
   );

@@ -1,4 +1,4 @@
-import RoomListNew from "@/components/room/room-list-new";
+import RoomListNew from "@/components/room/room-list";
 
 export const metadata = {
   title: 'Danh sách phòng - Truth or Dare',

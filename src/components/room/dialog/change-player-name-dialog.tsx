@@ -1,3 +1,7 @@
+import {
+  CommonAPIErrors,
+  PlayerErrors,
+} from "@/api/common/types/common-errors";
 import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
 import { useChangePlayerNamePostMutation } from "@/api/rooms";
 import FormProvider from "@/components/hook-form/form-provider";
@@ -47,7 +51,7 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
   );
 
   const ChangePlayerNameSchema = Yup.object().shape({
-    newName: Yup.string().required("Tên phòng không được để trống"),
+    newName: Yup.string().trim().required("Tên phòng không được để trống"),
   });
 
   const methods = useForm({
@@ -55,7 +59,7 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
     resolver: yupResolver(ChangePlayerNameSchema),
   });
 
-  const { handleSubmit, setValue } = methods;
+  const { handleSubmit, setValue, setError } = methods;
 
   useEffect(() => {
     if (requestData.playerName) {
@@ -68,7 +72,7 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
       setShouldRefetch(true);
       const roomInfo = {
         playerId: requestData.playerId,
-        newName: dataSubmit.newName,
+        newName: dataSubmit.newName.trim(),
       };
       const { status } = await changePlayerNameAsync(roomInfo);
       if (status === HTTP_CODES_ENUM.OK) {
@@ -88,10 +92,33 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
       }
     } catch (error) {
       console.error(error);
-      enqueueSnackbar({
-        message: "Đổi tên thất bại",
-        variant: "error",
-      });
+      const customError = error as CommonAPIErrors;
+      if (customError?.errors?.errorCode === PlayerErrors.PlayerNameExisted) {
+        enqueueSnackbar({
+          message: "Tên người chơi đã tồn tại",
+          variant: "error",
+        });
+        setError("newName", {
+          type: "manual",
+          message: "Tên người chơi đã tồn tại",
+        });
+      } else if (
+        customError?.errors?.errorCode === PlayerErrors.PlayerNameLength
+      ) {
+        enqueueSnackbar({
+          message: "Tên người chơi không được quá 50 ký tự",
+          variant: "error",
+        });
+        setError("newName", {
+          type: "manual",
+          message: "Tên người chơi không được quá 50 ký tự",
+        });
+      } else {
+        enqueueSnackbar({
+          message: "Đổi tên thất bại",
+          variant: "error",
+        });
+      }
       setShouldRefetch(false);
     }
   });
