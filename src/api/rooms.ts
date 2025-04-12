@@ -71,6 +71,7 @@ export type PostRoomRequest = {
   maxPlayer: number;
   mode: QuestionModeEnum;
   ageGroup: RoomAgeGroupEnum;
+  playerId?: string;
 };
 
 export function useRoomPostMutation() {
@@ -104,6 +105,7 @@ export function useRoomPostMutation() {
 export type JoinPostRoomRequest = {
   playerName?: string;
   roomPassword?: string;
+  playerId?: string;
 };
 
 export function useJoinRoomPostMutation(roomId: Room["roomId"]) {

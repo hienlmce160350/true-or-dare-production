@@ -5,7 +5,7 @@ import FormProvider from "@/components/hook-form/form-provider";
 import { RHFSelect } from "@/components/hook-form/rhf-select";
 import RHFTextField from "@/components/hook-form/rhf-text-field";
 import { useCheckMobile } from "@/hooks/use-check-screen-type";
-import { setStorage } from "@/hooks/use-local-storage";
+import { getStorage, setStorage } from "@/hooks/use-local-storage";
 import { QuestionModeEnum } from "@/types/question/question-mode-enum";
 import { RoomAgeGroupEnum } from "@/types/room/room-age-group-enum";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -37,16 +37,19 @@ function CreateRoomDialog({ open, onClose }: Props) {
   const router = useRouter();
   const [shouldRefetch, setShouldRefetch] = useState(false);
   const { postRoomAsync } = useRoomPostMutation();
+
+  const playerState = getStorage("player");
+
   const defaultValues = useMemo(
     () => ({
       roomName: "",
-      playerName: "",
+      playerName: (playerState?.state?.playerName as string) || "",
       roomPassword: "",
       maxPlayer: 2,
       mode: QuestionModeEnum.Party,
       ageGroup: RoomAgeGroupEnum.All,
     }),
-    []
+    [playerState?.state?.playerName]
   );
 
   const CreateRoomSchema = Yup.object().shape({
@@ -69,12 +72,17 @@ function CreateRoomDialog({ open, onClose }: Props) {
     handleSubmit,
     formState: { errors },
     setError,
+    watch,
   } = methods;
 
   const onSubmit = handleSubmit(async (dataSubmit) => {
     try {
       setShouldRefetch(true);
+      if (dataSubmit.mode === QuestionModeEnum.Couples) {
+        dataSubmit.maxPlayer = 2;
+      }
       const roomInfo = {
+        playerId: playerState?.state?.playerId,
         roomName: dataSubmit.roomName,
         playerName: dataSubmit.playerName ? dataSubmit.playerName.trim() : "",
         roomPassword: dataSubmit.roomPassword ? dataSubmit.roomPassword : "",
@@ -92,12 +100,22 @@ function CreateRoomDialog({ open, onClose }: Props) {
           message: "Tạo phòng thành công",
           variant: "success",
         });
-        const state = {
-          state: {
-            playerId: data?.players[data?.players.length - 1]?.playerId,
-            playerName: data?.players[data?.players.length - 1]?.playerName,
-          },
-        };
+        let state;
+        if (playerState?.state?.playerName) {
+          state = {
+            state: {
+              playerId: playerState?.state?.playerId,
+              playerName: playerState?.state?.playerName,
+            },
+          };
+        } else {
+          state = {
+            state: {
+              playerId: playerState?.state?.playerId,
+              playerName: data?.players[data?.players.length - 1]?.playerName,
+            },
+          };
+        }
         setStorage("player", state);
         setShouldRefetch(false);
         onClose();
@@ -215,15 +233,16 @@ function CreateRoomDialog({ open, onClose }: Props) {
                   type="password"
                 />
               </FormControl>
-
-              <FormControl sx={sxFormControl}>
-                <RHFTextField
-                  name="playerName"
-                  label="Tên người chơi"
-                  placeholder="Nhập tên"
-                  variant="outlined"
-                />
-              </FormControl>
+              {playerState?.state?.playerName ? null : (
+                <FormControl sx={sxFormControl}>
+                  <RHFTextField
+                    name="playerName"
+                    label="Tên người chơi"
+                    placeholder="Nhập tên"
+                    variant="outlined"
+                  />
+                </FormControl>
+              )}
 
               <FormControl sx={sxFormControl}>
                 <RHFSelect name="mode" label="Chế độ">
@@ -245,14 +264,16 @@ function CreateRoomDialog({ open, onClose }: Props) {
                 </RHFSelect>
               </FormControl>
 
-              <FormControl sx={sxFormControl}>
-                <RHFTextField
-                  name="maxPlayer"
-                  label="Số lượng người chơi"
-                  placeholder="Nhập số lượng"
-                  type="number"
-                />
-              </FormControl>
+              {watch("mode") === QuestionModeEnum.Couples ? null : (
+                <FormControl sx={sxFormControl}>
+                  <RHFTextField
+                    name="maxPlayer"
+                    label="Số lượng người chơi"
+                    placeholder="Nhập số lượng"
+                    type="number"
+                  />
+                </FormControl>
+              )}
             </div>
             <div className="flex w-full justify-end mt-3">
               <Button

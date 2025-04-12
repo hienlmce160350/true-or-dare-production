@@ -1,10 +1,14 @@
-import { CommonAPIErrors, RoomErrors } from "@/api/common/types/common-errors";
+import {
+  CommonAPIErrors,
+  PlayerErrors,
+  RoomErrors,
+} from "@/api/common/types/common-errors";
 import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
 import { useJoinRoomPostMutation } from "@/api/rooms";
 import FormProvider from "@/components/hook-form/form-provider";
 import RHFTextField from "@/components/hook-form/rhf-text-field";
 import { useCheckMobile } from "@/hooks/use-check-screen-type";
-import { setStorage } from "@/hooks/use-local-storage";
+import { getStorage, setStorage } from "@/hooks/use-local-storage";
 import { Room } from "@/types/room/room";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
@@ -35,12 +39,15 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
   const [shouldRefetch, setShouldRefetch] = useState(false);
   const router = useRouter();
   const { joinRoomAsync } = useJoinRoomPostMutation(room?.roomId as string);
+
+  const playerState = getStorage("player");
+
   const defaultValues = useMemo(
     () => ({
-      playerName: "",
+      playerName: (playerState?.state?.playerName as string) || "",
       roomPassword: "",
     }),
-    []
+    [playerState?.state?.playerName]
   );
 
   const JoinRoomSchema = Yup.object().shape({
@@ -62,6 +69,7 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
       setShouldRefetch(true);
 
       const roomInfo = {
+        playerId: playerState?.state?.playerId,
         playerName: dataSubmit.playerName ? dataSubmit.playerName.trim() : "",
         roomPassword: dataSubmit.roomPassword ? dataSubmit.roomPassword : "",
       };
@@ -72,12 +80,22 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
           message: "Vào phòng thành công",
           variant: "success",
         });
-        const state = {
-          state: {
-            playerId: data.playerId,
-            playerName: data.playerName,
-          },
-        };
+        let state;
+        if (playerState?.state?.playerName) {
+          state = {
+            state: {
+              playerId: playerState?.state?.playerId,
+              playerName: playerState?.state?.playerName,
+            },
+          };
+        } else {
+          state = {
+            state: {
+              playerId: data.playerId,
+              playerName: data.playerName,
+            },
+          };
+        }
         setStorage("player", state);
         setShouldRefetch(false);
         router.push(`/rooms/${data?.roomId}`);
@@ -92,6 +110,28 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
         enqueueSnackbar({
           message: "Mật khẩu không đúng",
           variant: "error",
+        });
+      } else if (
+        customError?.errors?.errorCode === PlayerErrors.PlayerNameExisted
+      ) {
+        enqueueSnackbar({
+          message: "Tên người chơi đã tồn tại",
+          variant: "error",
+        });
+        setError("playerName", {
+          type: "manual",
+          message: "Tên người chơi đã tồn tại",
+        });
+      } else if (
+        customError?.errors?.errorCode === PlayerErrors.PlayerNameLength
+      ) {
+        enqueueSnackbar({
+          message: "Tên người chơi không được quá 50 ký tự",
+          variant: "error",
+        });
+        setError("playerName", {
+          type: "manual",
+          message: "Tên người chơi không được quá 50 ký tự",
         });
       } else {
         enqueueSnackbar({
@@ -150,14 +190,16 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
         <Box sx={{ py: 0, bgcolor: "background.paper", borderRadius: 2 }}>
           <FormProvider methods={methods} onSubmit={onSubmit} className="mt-4">
             <div className="flex flex-col gap-2">
-              <FormControl sx={sxFormControl}>
-                <RHFTextField
-                  name="playerName"
-                  label="Tên người chơi"
-                  placeholder="Nhập tên"
-                  variant="outlined"
-                />
-              </FormControl>
+              {playerState?.state?.playerName ? null : (
+                <FormControl sx={sxFormControl}>
+                  <RHFTextField
+                    name="playerName"
+                    label="Tên người chơi"
+                    placeholder="Nhập tên"
+                    variant="outlined"
+                  />
+                </FormControl>
+              )}
 
               {room?.hasPassword && (
                 <FormControl sx={sxFormControl}>

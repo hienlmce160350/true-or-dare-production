@@ -7,6 +7,7 @@ import { LuSparkles, LuZap } from "react-icons/lu";
 import SnackbarProvider from "@/components/snackbar/snackbar-provider";
 import { SettingsThemeValueProps } from "@/components/settings/types";
 import { SettingsProvider } from "@/components/settings/context/settings-provider";
+import GuidInitializer from "@/components/guid-initializer/page";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,6 +49,7 @@ export default function RootLayout({
           <ReactQueryDevtools initialIsOpen={false} />
           <SettingsProvider defaultSettings={defaultSettings}>
             <SnackbarProvider>
+              <GuidInitializer /> {/* Khởi tạo GUID trên mọi trang */}
               <div className="m-auto font-[family-name:var(--font-geist-sans)]">
                 <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-purple-800 to-blue-500 p-6">
                   <div className="mb-8 flex flex-col items-center">

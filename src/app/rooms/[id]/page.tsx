@@ -134,7 +134,7 @@ const RoomPage = () => {
 
   const playerHost = room?.players?.find((player) => player.isHost);
 
-  const checkHost = playerHost?.playerName === playerState?.state?.playerName;
+  const checkHost = playerHost?.playerId === playerState?.state?.playerId;
 
   // Timer effect
   // useEffect(() => {
@@ -304,7 +304,7 @@ const RoomPage = () => {
                       }
                     >
                       <ListItemAvatar className="flex justify-center items-center gap-2">
-                        {player.playerName === playerState.state.playerName && (
+                        {player.playerId === playerState.state.playerId && (
                           <Chip label="Bạn" size="small" color="primary" />
                         )}
                         <Avatar className="player-avatar">
