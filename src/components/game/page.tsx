@@ -24,6 +24,7 @@ interface GameScreenProps {
   // onBack: () => void;
   roomId?: string;
   setGameEndDialogOpen: (open: boolean) => void;
+  currentPlayerIdTurn?: string;
 }
 
 // Định nghĩa kiểu dữ liệu cho lịch sử câu hỏi
@@ -38,8 +39,15 @@ export default function GameScreen({
   players,
   roomId,
   setGameEndDialogOpen,
+  currentPlayerIdTurn,
 }: GameScreenProps) {
-  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+  const playerHost = players.find(
+    (player) => player.isHost === players[0].isHost
+  );
+  const playerIndex = players.findIndex(
+    (player) =>
+      player.playerId === (currentPlayerIdTurn || playerHost?.playerId)
+  );
   const [questionType, setQuestionType] = useState<QuestionTypeEnum | null>(
     null
   );
@@ -113,11 +121,14 @@ export default function GameScreen({
   );
 
   const selectQuestionType = async (type: QuestionTypeEnum) => {
+    const playerIndex = players.findIndex(
+      (player) => player.playerId === currentPlayerIdTurn
+    );
     setQuestionType(type);
     setIsRevealing(true);
     try {
       const { data, status } = await getQuestionRoomAsync({
-        playerId: players[currentPlayerIndex].playerId,
+        playerId: players[playerIndex].playerId,
         questionType: type,
       });
       if (status === HTTP_CODES_ENUM.OK) {
@@ -143,10 +154,13 @@ export default function GameScreen({
 
   const { nextPlayerRoomAsync } = useNextPlayerPatchMutation(roomId as string);
   const nextTurn = async () => {
+    const playerIndex = players.findIndex(
+      (player) => player.playerId === currentPlayerIdTurn
+    );
     // Lưu câu hỏi hiện tại vào lịch sử trước khi chuyển lượt
     if (questionType && currentQuestion) {
       const historyItem: QuestionHistory = {
-        playerName: players[currentPlayerIndex].playerName,
+        playerName: players[playerIndex].playerName,
         questionType: questionType,
         questionText: currentQuestion.text,
         timestamp: new Date(),
@@ -156,16 +170,12 @@ export default function GameScreen({
     }
 
     try {
-      const { data, status } = await nextPlayerRoomAsync({
-        playerId: players[currentPlayerIndex].playerId,
+      const { status } = await nextPlayerRoomAsync({
+        playerId: players[playerIndex].playerId,
       });
       if (status === HTTP_CODES_ENUM.OK) {
         setQuestionType(null);
         setCurrentQuestion(null);
-        const playerIndex = players.findIndex(
-          (player) => player.playerId === data.nextPlayerId
-        );
-        setCurrentPlayerIndex(playerIndex);
       }
     } catch (error) {
       console.error("Error next player:", error);
@@ -173,10 +183,13 @@ export default function GameScreen({
   };
 
   const lastTurn = async () => {
+    const playerIndex = players.findIndex(
+      (player) => player.playerId === currentPlayerIdTurn
+    );
     // Lưu câu hỏi hiện tại vào lịch sử trước khi chuyển lượt
     if (questionType && currentQuestion) {
       const historyItem: QuestionHistory = {
-        playerName: players[currentPlayerIndex].playerName,
+        playerName: players[playerIndex].playerName,
         questionType: questionType,
         questionText: currentQuestion.text,
         timestamp: new Date(),
@@ -187,7 +200,7 @@ export default function GameScreen({
 
     try {
       const { data, status } = await nextPlayerRoomAsync({
-        playerId: players[currentPlayerIndex].playerId,
+        playerId: players[playerIndex].playerId,
       });
       if (status === HTTP_CODES_ENUM.OK) {
         if (data.isGameEnded) {
@@ -293,7 +306,7 @@ export default function GameScreen({
               >
                 <p className="text-sm text-gray-500">Lượt của</p>
                 <p className="text-xl font-bold text-gray-800">
-                  {players[currentPlayerIndex].playerName}
+                  {players[playerIndex].playerName}
                 </p>
               </motion.div>
 
@@ -342,7 +355,7 @@ export default function GameScreen({
               >
                 <p className="text-sm text-gray-500">Lượt của</p>
                 <p className="text-xl font-bold text-gray-800">
-                  {players[currentPlayerIndex].playerName}
+                  {players[playerIndex].playerName}
                 </p>
                 <p className="mt-1 text-sm font-medium text-gray-600">
                   Đã chọn:{" "}

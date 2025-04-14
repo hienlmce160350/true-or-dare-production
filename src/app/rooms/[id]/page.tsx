@@ -229,6 +229,8 @@ const RoomPage = () => {
     setSnackbarOpen(true);
   };
 
+  const playerList = room?.players?.filter((player) => player.isActive);
+
   return (
     <Container maxWidth="lg">
       {roomLoading ? (
@@ -285,7 +287,7 @@ const RoomPage = () => {
                 Người chơi ({room?.players?.length})
               </Typography>
               <List sx={{ bgcolor: "background.paper", borderRadius: 2 }}>
-                {room?.players?.map((player, index) => (
+                {playerList?.map((player, index) => (
                   <Box key={player.playerId}>
                     <ListItem
                       className="flex-wrap gap-2"
@@ -427,6 +429,7 @@ const RoomPage = () => {
                   players={room?.players}
                   roomId={roomId as string}
                   setGameEndDialogOpen={setGameEndDialogOpen}
+                  currentPlayerIdTurn={room?.currentPlayerIdTurn}
                 />
               )}
             </Paper>

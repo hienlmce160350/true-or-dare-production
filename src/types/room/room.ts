@@ -8,7 +8,7 @@ export type Room = {
   roomName: string;
   players: Player[];
   currentQuestionId: string;
-  currentPlayerTurn: string;
+  currentPlayerIdTurn: string;
   status: RoomStatusEnum;
   createdBy: string;
   createdAt: Date;

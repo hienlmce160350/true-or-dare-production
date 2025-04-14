@@ -349,6 +349,7 @@ export type NextPlayerPatchRoomRequest = {
 };
 
 export function useNextPlayerPatchMutation(roomId: Room["roomId"]) {
+  const queryClient = useQueryClient();
   const url = useMemo(() => `${endpoints.room.nextPlayer(roomId)}`, [roomId]);
 
   const { mutate, mutateAsync, error, isSuccess, isPending, reset } =
@@ -357,6 +358,11 @@ export function useNextPlayerPatchMutation(roomId: Room["roomId"]) {
       mutationKey: roomQueryKeys.nextPlayer(roomId).key,
       mutationFn: (request: NextPlayerPatchRoomRequest) =>
         patcher(url, { ...request }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: roomQueryKeys.detail(roomId).key,
+        });
+      },
     });
 
   const memoizedValue = useMemo(
