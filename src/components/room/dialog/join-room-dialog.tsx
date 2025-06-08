@@ -3,8 +3,7 @@ import {
   PlayerErrors,
   RoomErrors,
 } from "@/api/common/types/common-errors";
-import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
-import { useJoinRoomPostMutation } from "@/api/rooms";
+import { JoinPostRoomRequest } from "@/api/rooms";
 import FormProvider from "@/components/hook-form/form-provider";
 import RHFTextField from "@/components/hook-form/rhf-text-field";
 import { useCheckMobile } from "@/hooks/use-check-screen-type";
@@ -23,10 +22,12 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "notistack";
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useState, useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { FaTimes } from "react-icons/fa";
 import * as Yup from "yup";
+import { signalRMethods, useGameStore } from "@/lib/signalr-connection";
+import { Event } from "@/types/event/event";
 
 type Props = {
   open: boolean;
@@ -36,10 +37,10 @@ type Props = {
 
 function JoinRoomDialog({ open, onClose, room }: Props) {
   const { enqueueSnackbar } = useSnackbar();
-  const [shouldRefetch, setShouldRefetch] = useState(false);
   const router = useRouter();
-  const { joinRoomAsync } = useJoinRoomPostMutation(room?.roomId as string);
-
+  const connection = useGameStore((state) => state.connection);
+  const updateGameState = useGameStore((state) => state.updateGameState);
+  const [isLoading, setIsLoading] = useState(false);
   const playerState = getStorage("player");
 
   const defaultValues = useMemo(
@@ -62,44 +63,91 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
     resolver: yupResolver(JoinRoomSchema),
   });
 
-  const { handleSubmit, setError } = methods;
+  const { handleSubmit, setError, getValues } = methods;
+
+  const handleJoinRoom = useCallback(
+    async ({ playerId, playerName, roomPassword }: JoinPostRoomRequest) => {
+      if (!connection) {
+        alert("Kết nối không thành công. Vui lòng thử lại sau.");
+        return;
+      }
+
+      if (!room?.roomId || !playerName) {
+        alert("Room ID và player name là bắt buộc.");
+        return;
+      }
+
+      try {
+        // Update local state first
+        updateGameState({
+          roomId: room?.roomId,
+          playerId,
+          playerName,
+          isHost: false,
+        });
+
+        // Join room via SignalR
+        await signalRMethods.joinRoom(
+          connection,
+          room?.roomId,
+          playerId as string,
+          playerName,
+          (roomPassword as string) || ""
+        );
+      } catch (error) {
+        const customError = error as CommonAPIErrors;
+        if (customError?.errors?.errorCode === RoomErrors.RoomPasswordIsWrong) {
+          setError("roomPassword", {
+            type: "manual",
+            message: "Mật khẩu không đúng",
+          });
+          enqueueSnackbar({
+            message: "Mật khẩu không đúng",
+            variant: "error",
+          });
+        } else if (
+          customError?.errors?.errorCode === PlayerErrors.PlayerNameExisted
+        ) {
+          enqueueSnackbar({
+            message: "Tên người chơi đã tồn tại",
+            variant: "error",
+          });
+          setError("playerName", {
+            type: "manual",
+            message: "Tên người chơi đã tồn tại",
+          });
+        } else if (
+          customError?.errors?.errorCode === PlayerErrors.PlayerNameLength
+        ) {
+          enqueueSnackbar({
+            message: "Tên người chơi không được quá 50 ký tự",
+            variant: "error",
+          });
+          setError("playerName", {
+            type: "manual",
+            message: "Tên người chơi không được quá 50 ký tự",
+          });
+        } else {
+          enqueueSnackbar({
+            message: "Vào phòng thất bại",
+            variant: "error",
+          });
+        }
+        setIsLoading(false);
+      }
+    },
+    [connection, enqueueSnackbar, room?.roomId, setError, updateGameState]
+  );
 
   const onSubmit = handleSubmit(async (dataSubmit) => {
     try {
-      setShouldRefetch(true);
-
       const roomInfo = {
         playerId: playerState?.state?.playerId,
         playerName: dataSubmit.playerName ? dataSubmit.playerName.trim() : "",
         roomPassword: dataSubmit.roomPassword ? dataSubmit.roomPassword : "",
       };
 
-      const { data, status } = await joinRoomAsync(roomInfo);
-      if (data.roomId && status === HTTP_CODES_ENUM.OK) {
-        enqueueSnackbar({
-          message: "Vào phòng thành công",
-          variant: "success",
-        });
-        let state;
-        if (playerState?.state?.playerName) {
-          state = {
-            state: {
-              playerId: playerState?.state?.playerId,
-              playerName: playerState?.state?.playerName,
-            },
-          };
-        } else {
-          state = {
-            state: {
-              playerId: data.playerId,
-              playerName: data.playerName,
-            },
-          };
-        }
-        setStorage("player", state);
-        setShouldRefetch(false);
-        router.push(`/rooms/${data?.roomId}`);
-      }
+      await handleJoinRoom(roomInfo);
     } catch (error) {
       const customError = error as CommonAPIErrors;
       if (customError?.errors?.errorCode === RoomErrors.RoomPasswordIsWrong) {
@@ -139,10 +187,45 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
           variant: "error",
         });
       }
-
-      setShouldRefetch(false);
+      setIsLoading(false);
     }
   });
+
+  useEffect(() => {
+    connection?.on(Event.JoinRoomSuccess, () => {
+      let state;
+      if (playerState?.state?.playerName) {
+        state = {
+          state: {
+            playerId: playerState?.state?.playerId,
+            playerName: playerState?.state?.playerName,
+          },
+        };
+      } else {
+        state = {
+          state: {
+            playerId: playerState?.state?.playerId,
+            playerName: getValues("playerName"),
+          },
+        };
+      }
+      setStorage("player", state);
+      setIsLoading(false);
+      router.push(`/rooms/${room?.roomId}`);
+      enqueueSnackbar({
+        message: "Vào phòng thành công",
+        variant: "success",
+      });
+    });
+  }, [
+    connection,
+    router,
+    room?.roomId,
+    playerState?.state?.playerName,
+    playerState?.state?.playerId,
+    enqueueSnackbar,
+    getValues,
+  ]);
 
   const sxFormControl = useMemo(
     () => ({
@@ -228,8 +311,9 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
                   },
                 }}
                 className="w-fit flex items-center gap-1"
+                disabled={isLoading}
               >
-                {shouldRefetch && (
+                {isLoading && (
                   <CircularProgress color="inherit" className="!h-5 !w-5" />
                 )}
                 Tham gia

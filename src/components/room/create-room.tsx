@@ -1,12 +1,14 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import * as Yup from "yup";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { useRoomPostMutation } from "@/api/rooms";
+import { PostRoomRequest } from "@/api/rooms";
 import FormProvider from "../hook-form/form-provider";
 import {
+  Alert,
+  Box,
   Button,
   CircularProgress,
   FormControl,
@@ -19,18 +21,29 @@ import { useSnackbar } from "notistack";
 import { IoHomeOutline } from "react-icons/io5";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
-import { getStorage, setStorage } from "@/hooks/use-local-storage";
+import { getStorage } from "@/hooks/use-local-storage";
 import { QuestionModeEnum } from "@/types/question/question-mode-enum";
 import { RoomAgeGroupEnum } from "@/types/room/room-age-group-enum";
 import { RHFSelect } from "../hook-form/rhf-select";
 import { CommonAPIErrors, RoomErrors } from "@/api/common/types/common-errors";
+import {
+  ConnectionState,
+  ensureConnection,
+  signalRMethods,
+  useGameStore,
+} from "@/lib/signalr-connection";
+import { Event } from "@/types/event/event";
 
 const CreateRoom = () => {
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
-  const [shouldRefetch, setShouldRefetch] = useState(false);
-  const { postRoomAsync } = useRoomPostMutation();
+  const connectionState = useGameStore((state) => state.connectionState);
+  const connection = useGameStore((state) => state.connection);
+  const updateGameState = useGameStore((state) => state.updateGameState);
+  const setError = useGameStore((state) => state.setError);
+  const error = useGameStore((state) => state.error);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const playerState = getStorage("player");
 
@@ -65,13 +78,105 @@ const CreateRoom = () => {
   const {
     handleSubmit,
     formState: { errors },
-    setError,
+    setError: setFormError,
     watch,
   } = methods;
 
+  // Reset error state when dialog opens/closes
+  useEffect(() => {
+    setError(null);
+  }, [setError]);
+
+  // Handle API errors
+  useEffect(() => {
+    if (error) {
+      if (error.errors?.errorCode === RoomErrors.RoomAlreadyExists) {
+        setFormError("roomName", {
+          type: "manual",
+          message: "Tên phòng đã tồn tại",
+        });
+        enqueueSnackbar({
+          message: "Tên phòng đã tồn tại",
+          variant: "error",
+        });
+      } else {
+        enqueueSnackbar({
+          message:
+            error.errors?.message ||
+            "Tạo phòng thất bại. Vui lòng thử lại sau.",
+          variant: "error",
+        });
+      }
+      setIsLoading(false);
+      setError(null);
+    }
+  }, [error, enqueueSnackbar, setFormError, setError]);
+
+  const handleCreateRoom = async ({
+    playerId,
+    playerName,
+    roomPassword,
+    roomName,
+    maxPlayer,
+    mode,
+    ageGroup,
+  }: PostRoomRequest) => {
+    if (!connection) {
+      alert("Kết nối không thành công. Vui lòng thử lại sau.");
+      return;
+    }
+
+    if (!roomName || !playerName) {
+      alert("Tên phòng và tên người chơi không được để trống.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Update local state first
+      updateGameState({
+        roomName,
+        playerId,
+        playerName,
+        isHost: true,
+      });
+
+      // Create room via SignalR
+      await signalRMethods.createRoom(
+        connection,
+        roomName,
+        playerId || "",
+        playerName,
+        roomPassword || "",
+        ageGroup,
+        mode,
+        maxPlayer
+      );
+    } catch (error) {
+      const customError = error as CommonAPIErrors;
+      // console.error("Failed to create room:", error);
+      if (customError?.errors?.errorCode === RoomErrors.RoomAlreadyExists) {
+        setFormError("roomName", {
+          type: "manual",
+          message: "Tên phòng đã tồn tại",
+        });
+        enqueueSnackbar({
+          message: "Tên phòng đã tồn tại",
+          variant: "error",
+        });
+      } else {
+        enqueueSnackbar({
+          message: "Tạo phòng thất bại. Vui lòng thử lại sau.",
+          variant: "error",
+        });
+      }
+      setIsLoading(false);
+    }
+  };
+
   const onSubmit = handleSubmit(async (dataSubmit) => {
     try {
-      setShouldRefetch(true);
       if (dataSubmit.mode === QuestionModeEnum.Couples) {
         dataSubmit.maxPlayer = 2;
       }
@@ -88,37 +193,12 @@ const CreateRoom = () => {
           ? (dataSubmit.ageGroup as RoomAgeGroupEnum)
           : RoomAgeGroupEnum.All,
       };
-      const { data, status } = await postRoomAsync(roomInfo);
-      if (data.roomId && status === HTTP_CODES_ENUM.OK) {
-        enqueueSnackbar({
-          message: "Tạo phòng thành công",
-          variant: "success",
-        });
-        let state;
-        if (playerState?.state?.playerName) {
-          state = {
-            state: {
-              playerId: playerState?.state?.playerId,
-              playerName: playerState?.state?.playerName,
-            },
-          };
-        } else {
-          state = {
-            state: {
-              playerId: playerState?.state?.playerId,
-              playerName: data?.players[data?.players.length - 1]?.playerName,
-            },
-          };
-        }
-        setStorage("player", state);
-        setShouldRefetch(false);
-        router.push(`/rooms/${data?.roomId}`);
-      }
+      await handleCreateRoom(roomInfo);
     } catch (error) {
       const customError = error as CommonAPIErrors;
       console.error(error);
       if (customError?.errors?.errorCode === RoomErrors.RoomAlreadyExists) {
-        setError("roomName", {
+        setFormError("roomName", {
           type: "manual",
           message: "Tên phòng đã tồn tại",
         });
@@ -132,7 +212,6 @@ const CreateRoom = () => {
           variant: "error",
         });
       }
-      setShouldRefetch(false);
     }
   });
 
@@ -184,6 +263,41 @@ const CreateRoom = () => {
     []
   );
 
+  useEffect(() => {
+    connection?.on(Event.CreateRoomSuccess, (result) => {
+      enqueueSnackbar({
+        message: "Tạo phòng thành công",
+        variant: "success",
+      });
+      router.push(`/rooms/${result.roomId}`);
+    });
+  }, [connection, enqueueSnackbar, router]);
+
+  // Ensure connection is established when dialog opens
+  useEffect(() => {
+    const connectToSignalR = async () => {
+      if (connectionState !== ConnectionState.Connected) {
+        setIsConnecting(true);
+        try {
+          const serverUrl =
+            process.env.NEXT_PUBLIC_SIGNALR_URL ||
+            "https://your-signalr-server.com";
+          await ensureConnection(serverUrl);
+          setIsConnecting(false);
+        } catch (error) {
+          console.error("Failed to connect to SignalR:", error);
+          enqueueSnackbar({
+            message: "Không thể kết nối đến máy chủ. Vui lòng thử lại sau.",
+            variant: "error",
+          });
+          setIsConnecting(false);
+        }
+      }
+    };
+
+    connectToSignalR();
+  }, [connectionState, enqueueSnackbar]);
+
   return (
     <>
       <div className="w-full max-w-md bg-white p-3 shadow-lg relative rounded-md">
@@ -200,82 +314,121 @@ const CreateRoom = () => {
             Tạo phòng chơi
           </motion.h2>
         </div>
-        <FormProvider methods={methods} onSubmit={onSubmit} className="mt-4">
-          <div className="flex flex-col gap-2">
-            <FormControl sx={sxFormControl}>
-              <RHFTextField
-                name="roomName"
-                label="Tên phòng"
-                placeholder="Nhập tên"
-                variant="outlined"
-              />
-            </FormControl>
-
-            <FormControl sx={sxFormControl}>
-              <RHFTextField
-                name="roomPassword"
-                label="Mật khẩu"
-                placeholder="Nhập mật khẩu"
-                variant="outlined"
-                type="password"
-              />
-            </FormControl>
-
-            {playerState?.state?.playerName ? null : (
+        {isConnecting ? (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              py: 4,
+            }}
+          >
+            <CircularProgress size={40} />
+            <Box sx={{ mt: 2 }}>Đang kết nối đến máy chủ...</Box>
+          </Box>
+        ) : connectionState !== ConnectionState.Connected ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Không thể kết nối đến máy chủ. Vui lòng thử lại sau.
+            <Button
+              variant="outlined"
+              size="small"
+              sx={{ ml: 2 }}
+              onClick={async () => {
+                setIsConnecting(true);
+                try {
+                  const serverUrl =
+                    process.env.NEXT_PUBLIC_SIGNALR_URL ||
+                    "https://your-signalr-server.com";
+                  await ensureConnection(serverUrl);
+                  setIsConnecting(false);
+                } catch (error) {
+                  console.error("Failed to reconnect:", error);
+                  setIsConnecting(false);
+                }
+              }}
+            >
+              Kết nối lại
+            </Button>
+          </Alert>
+        ) : (
+          <FormProvider methods={methods} onSubmit={onSubmit} className="mt-4">
+            <div className="flex flex-col gap-2">
               <FormControl sx={sxFormControl}>
                 <RHFTextField
-                  name="playerName"
-                  label="Tên người chơi"
+                  name="roomName"
+                  label="Tên phòng"
                   placeholder="Nhập tên"
                   variant="outlined"
                 />
               </FormControl>
-            )}
 
-            <FormControl sx={sxFormControl}>
-              <RHFSelect name="mode" label="Chế độ">
-                {memoizedModesMenuItems}
-                {errors.mode && (
-                  <FormHelperText error>{errors.mode.message}</FormHelperText>
-                )}
-              </RHFSelect>
-            </FormControl>
-
-            <FormControl sx={sxFormControl}>
-              <RHFSelect name="ageGroup" label="Độ tuổi">
-                {memoizedAgeGroupMenuItems}
-                {errors.ageGroup && (
-                  <FormHelperText error>
-                    {errors.ageGroup.message}
-                  </FormHelperText>
-                )}
-              </RHFSelect>
-            </FormControl>
-            {watch("mode") === QuestionModeEnum.Couples ? null : (
               <FormControl sx={sxFormControl}>
                 <RHFTextField
-                  name="maxPlayer"
-                  label="Số lượng người chơi"
-                  placeholder="Nhập số lượng"
-                  type="number"
+                  name="roomPassword"
+                  label="Mật khẩu"
+                  placeholder="Nhập mật khẩu"
+                  variant="outlined"
+                  type="password"
                 />
               </FormControl>
-            )}
-          </div>
-          <div className="flex w-full justify-end mt-3">
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              className="w-fit"
-            >
-              {shouldRefetch && (
-                <CircularProgress color="inherit" className="!h-5 !w-5" />
+
+              {playerState?.state?.playerName ? null : (
+                <FormControl sx={sxFormControl}>
+                  <RHFTextField
+                    name="playerName"
+                    label="Tên người chơi"
+                    placeholder="Nhập tên"
+                    variant="outlined"
+                  />
+                </FormControl>
               )}
-              Tạo
-            </Button>
-          </div>
-        </FormProvider>
+
+              <FormControl sx={sxFormControl}>
+                <RHFSelect name="mode" label="Chế độ">
+                  {memoizedModesMenuItems}
+                  {errors.mode && (
+                    <FormHelperText error>{errors.mode.message}</FormHelperText>
+                  )}
+                </RHFSelect>
+              </FormControl>
+
+              <FormControl sx={sxFormControl}>
+                <RHFSelect name="ageGroup" label="Độ tuổi">
+                  {memoizedAgeGroupMenuItems}
+                  {errors.ageGroup && (
+                    <FormHelperText error>
+                      {errors.ageGroup.message}
+                    </FormHelperText>
+                  )}
+                </RHFSelect>
+              </FormControl>
+              {watch("mode") === QuestionModeEnum.Couples ? null : (
+                <FormControl sx={sxFormControl}>
+                  <RHFTextField
+                    name="maxPlayer"
+                    label="Số lượng người chơi"
+                    placeholder="Nhập số lượng"
+                    type="number"
+                  />
+                </FormControl>
+              )}
+            </div>
+            <div className="flex w-full justify-end mt-3">
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                className="w-fit"
+                disabled={isLoading}
+              >
+                {isLoading && (
+                  <CircularProgress color="inherit" className="!h-5 !w-5" />
+                )}
+                Tạo
+              </Button>
+            </div>
+          </FormProvider>
+        )}
       </div>
     </>
   );

@@ -62,7 +62,6 @@ const RoomList = () => {
   const [filters, setFilters] = useState(defaultFilters);
 
   const handleFilters = useCallback((name: string, value: IFilterValue) => {
-    console.log("Name" + value);
     setFilters((prevState) => ({
       ...prevState,
       [name]: value,
@@ -203,7 +202,7 @@ const RoomList = () => {
           </Typography>
           <Tooltip title="Làm mới">
             <IconButton
-              onClick={() => roomTableRefetch}
+              onClick={() => roomTableRefetch()}
               sx={{ color: "white", mr: 1 }}
               disabled={roomsLoading}
             >
@@ -526,7 +525,7 @@ const RoomList = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                        <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                           <Typography sx={{ mb: 2 }}>
                             Không tìm thấy phòng nào phù hợp
                           </Typography>
