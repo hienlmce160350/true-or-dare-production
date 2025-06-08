@@ -48,6 +48,8 @@ import {
 } from "@/api/common/types/common-errors";
 import { signalRMethods, useGameStore } from "@/lib/signalr-connection";
 import { Event } from "@/types/event/event";
+import { IoStopOutline } from "react-icons/io5";
+import { RoomStatusEnum } from "@/types/room/room-status-enum";
 
 type RequestChangePlayerName = {
   playerId?: string;
@@ -61,6 +63,8 @@ const RoomPage = () => {
   const connection = useGameStore((state) => state.connection);
   const [gameStarted, setGameStarted] = useState(false);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [endGameDialogOpen, setEndGameDialogOpen] = useState(false);
+
   const [gameEndDialogOpen, setGameEndDialogOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -121,6 +125,20 @@ const RoomPage = () => {
     setSelectedPlayer({});
   }, []);
 
+  const handleOpenEndGameDialog = useCallback(() => {
+    setEndGameDialogOpen(true);
+    setSelectedPlayer({
+      roomId,
+      playerId: playerState?.state?.playerId,
+      playerName: playerState?.state?.playerName,
+    });
+  }, [playerState?.state?.playerId, playerState?.state?.playerName, roomId]);
+
+  const handleCloseEndGameDialog = useCallback(() => {
+    setEndGameDialogOpen(false);
+    setSelectedPlayer({});
+  }, []);
+
   const reconnectPlayerSignalR = useCallback(async () => {
     if (
       connection &&
@@ -173,6 +191,7 @@ const RoomPage = () => {
         roomId,
         playerState.state.playerId
       );
+      roomRefetch();
     } catch (error) {
       const customError = error as CommonAPIErrors;
       if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
@@ -219,6 +238,7 @@ const RoomPage = () => {
         roomId,
         playerState.state.playerId
       );
+      roomRefetch();
     } catch (error) {
       const customError = error as CommonAPIErrors;
       if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
@@ -233,6 +253,45 @@ const RoomPage = () => {
         });
       }
     }
+  }, [connection, roomId, playerState.state.playerId, roomRefetch]);
+
+  const handleEndGame = useCallback(async () => {
+    if (!connection) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Connection not established. Please refresh the page.",
+      });
+      return;
+    }
+
+    if (!roomId || !playerState?.state?.playerId) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Room ID and player ID are required.",
+      });
+      return;
+    }
+
+    try {
+      await signalRMethods.endGame(
+        connection,
+        roomId,
+        playerState.state.playerId
+      );
+    } catch (error) {
+      const customError = error as CommonAPIErrors;
+      if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
+        enqueueSnackbar({
+          variant: "error",
+          message: "Bạn không phải là chủ phòng",
+        });
+      } else {
+        enqueueSnackbar({
+          variant: "error",
+          message: "Không thể kết thúc trò chơi",
+        });
+      }
+    }
   }, [connection, roomId, playerState?.state?.playerId]);
 
   useEffect(() => {
@@ -241,11 +300,12 @@ const RoomPage = () => {
       setGameStarted(false);
       setCurrentPlayerId(null);
       showSnackbar("Bắt đầu lại trò chơi!");
+      roomRefetch();
     });
     return () => {
       connection?.off(Event.GameReset);
     };
-  }, [connection]);
+  }, [connection, roomRefetch]);
 
   const showSnackbar = (message: string) => {
     setSnackbarMessage(message);
@@ -272,6 +332,7 @@ const RoomPage = () => {
     connection?.on(Event.StartGameSuccess, () => {
       setGameStarted(true);
       showSnackbar("Trò chơi bắt đầu!");
+      roomRefetch();
     });
 
     connection?.on(Event.GameStarted, (result) => {
@@ -279,6 +340,7 @@ const RoomPage = () => {
         message: `Trò chơi bắt đầu!`,
         variant: "info",
       });
+      roomRefetch();
       setGameStarted(true);
       setCurrentPlayerId(result.currentPlayerId);
     });
@@ -299,6 +361,16 @@ const RoomPage = () => {
       connection?.off(Event.NextPlayerTurn);
     };
   }, [connection, roomRefetch]);
+
+  useEffect(() => {
+    connection?.on(Event.EndGameSuccess, () => {
+      handleCloseEndGameDialog();
+      setGameEndDialogOpen(true);
+    });
+    return () => {
+      connection?.off(Event.EndGameSuccess);
+    };
+  }, [connection, handleCloseEndGameDialog]);
 
   const handleFailed = useCallback((error: CommonAPIErrors) => {
     const customError = error as CommonAPIErrors;
@@ -384,16 +456,30 @@ const RoomPage = () => {
             }}
           >
             <Typography className="text-white">Phòng: {roomId}</Typography>
-            <Button
-              className="!text-white !border-white flex-none"
-              variant="outlined"
-              color="inherit"
-              startIcon={<MdExitToApp />}
-              onClick={handleOpenExitRoomDialog}
-              sx={{ bgcolor: "rgba(255,255,255,0.1)" }}
-            >
-              Rời phòng
-            </Button>
+            <div className="flex items-center gap-2">
+              {checkHost && room?.status === RoomStatusEnum.Playing && (
+                <Button
+                  className="!text-white !border-rose-500 flex-none !bg-rose-600 border hover:!bg-rose-500"
+                  variant="contained"
+                  color="inherit"
+                  startIcon={<IoStopOutline />}
+                  onClick={handleOpenEndGameDialog}
+                >
+                  Kết thúc
+                </Button>
+              )}
+
+              <Button
+                className="!text-white !border-white flex-none"
+                variant="outlined"
+                color="inherit"
+                startIcon={<MdExitToApp />}
+                onClick={handleOpenExitRoomDialog}
+                sx={{ bgcolor: "rgba(255,255,255,0.1)" }}
+              >
+                Rời phòng
+              </Button>
+            </div>
           </Box>
 
           <Box
@@ -555,6 +641,30 @@ const RoomPage = () => {
               color="primary"
             >
               Chơi lại
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={endGameDialogOpen}
+        onClose={handleCloseEndGameDialog}
+        PaperProps={{
+          sx: { borderRadius: 3 },
+        }}
+        disableScrollLock
+      >
+        <DialogTitle>Xác nhận kết thúc game</DialogTitle>
+        <DialogContent>
+          <Typography>Bạn có muốn kết thúc game không?</Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={handleCloseEndGameDialog} color="inherit">
+            Hủy
+          </Button>
+          {checkHost && (
+            <Button onClick={handleEndGame} variant="contained" color="primary">
+              Kết thúc
             </Button>
           )}
         </DialogActions>

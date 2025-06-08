@@ -14,7 +14,6 @@ const roomQueryKeys = createQueryKeys(["rooms"], {
   }),
   create: () => ({
     key: ["create"],
-  
   }),
   join: (request: Room["roomId"]) => ({
     key: [request],
