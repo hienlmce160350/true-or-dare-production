@@ -23,7 +23,7 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "notistack";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { FaTimes } from "react-icons/fa";
 import * as Yup from "yup";
@@ -46,8 +46,6 @@ function CreateRoomDialog({ open, onClose }: Props) {
   const connection = useGameStore((state) => state.connection);
   const connectionState = useGameStore((state) => state.connectionState);
   const updateGameState = useGameStore((state) => state.updateGameState);
-  const setError = useGameStore((state) => state.setError);
-  const error = useGameStore((state) => state.error);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -115,36 +113,6 @@ function CreateRoomDialog({ open, onClose }: Props) {
       connectToSignalR();
     }
   }, [open, connectionState, enqueueSnackbar]);
-
-  // Reset error state when dialog opens/closes
-  useEffect(() => {
-    setError(null);
-  }, [open, setError]);
-
-  // Handle API errors
-  useEffect(() => {
-    if (error) {
-      if (error.errors?.errorCode === RoomErrors.RoomAlreadyExists) {
-        setFormError("roomName", {
-          type: "manual",
-          message: "Tên phòng đã tồn tại",
-        });
-        enqueueSnackbar({
-          message: "Tên phòng đã tồn tại",
-          variant: "error",
-        });
-      } else {
-        enqueueSnackbar({
-          message:
-            error.errors?.message ||
-            "Tạo phòng thất bại. Vui lòng thử lại sau.",
-          variant: "error",
-        });
-      }
-      setIsLoading(false);
-      setError(null);
-    }
-  }, [error, enqueueSnackbar, setFormError, setError]);
 
   const handleCreateRoom = async ({
     playerId,
@@ -311,6 +279,37 @@ function CreateRoomDialog({ open, onClose }: Props) {
       router.push(`/rooms/${result.roomId}`);
     });
   }, [connection, enqueueSnackbar, onClose, router]);
+
+  const handleFailed = useCallback(
+    (error: CommonAPIErrors) => {
+      const customError = error as CommonAPIErrors;
+      console.log("customError: ", JSON.stringify(customError));
+      if (customError?.errors?.errorCode === RoomErrors.RoomAlreadyExists) {
+        setFormError("roomName", {
+          type: "manual",
+          message: "Tên phòng đã tồn tại",
+        });
+        enqueueSnackbar({
+          message: "Tên phòng đã tồn tại",
+          variant: "error",
+        });
+      } else {
+        enqueueSnackbar({
+          message: "Tạo phòng thất bại",
+          variant: "error",
+        });
+      }
+      setIsLoading(false);
+    },
+    [enqueueSnackbar, setFormError]
+  );
+
+  useEffect(() => {
+    connection?.on(Event.OperationFailed, handleFailed);
+    return () => {
+      connection?.off(Event.OperationFailed);
+    };
+  }, [connection, handleFailed]);
 
   return (
     <Dialog

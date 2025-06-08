@@ -13,6 +13,10 @@ export type CommonAPIErrors = Error & {
  */
 export enum RoomErrors {
   /**
+   * Password is wrong
+   */
+  RoomPasswordIsWrong = 1000,
+  /**
    * Room already exists
    */
   RoomAlreadyExists = 1001,
@@ -28,10 +32,6 @@ export enum RoomErrors {
    * Password is required for rooms with a password
    */
   RoomPasswordRequired = 1004,
-  /**
-   * Password is wrong
-   */
-  RoomPasswordIsWrong = 1005,
   /**
    * Host is required
    */
@@ -88,6 +88,16 @@ export enum RoomErrors {
    * Need to wait 1 second to next player
    */
   RoomNeedMoreTimeException = 1019,
+
+  /**
+   * Room is full
+   */
+  RoomFull = 1022,
+
+  /**
+   * Room have been started
+   */
+  RoomHaveBeenStarted = 1023,
 }
 
 /**
