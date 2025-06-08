@@ -60,6 +60,10 @@ export function useLocalStorage(key: string, initialState: any) {
 export const getStorage = (key: string) => {
   let value = null;
 
+  if (typeof window === "undefined") {
+    return;
+  }
+
   try {
     const result = window.localStorage.getItem(key);
 

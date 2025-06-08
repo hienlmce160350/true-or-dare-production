@@ -14,7 +14,7 @@ const roomQueryKeys = createQueryKeys(["rooms"], {
   }),
   create: () => ({
     key: ["create"],
-    // Optionally, if you need to differentiate between different POST operations, you can add parameters and dynamic values here.
+  
   }),
   join: (request: Room["roomId"]) => ({
     key: [request],
@@ -72,6 +72,7 @@ export type PostRoomRequest = {
   mode: QuestionModeEnum;
   ageGroup: RoomAgeGroupEnum;
   playerId?: string;
+  connectionId?: string;
 };
 
 export function useRoomPostMutation() {
@@ -106,6 +107,7 @@ export type JoinPostRoomRequest = {
   playerName?: string;
   roomPassword?: string;
   playerId?: string;
+  connectionId?: string;
 };
 
 export function useJoinRoomPostMutation(roomId: Room["roomId"]) {

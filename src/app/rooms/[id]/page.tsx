@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  useGetRoomByIdReactQuery,
-  useResetGamePatchMutation,
-  useStartGamePatchMutation,
-} from "@/api/rooms";
+import { useGetRoomByIdReactQuery } from "@/api/rooms";
 import { getStorage } from "@/hooks/use-local-storage";
 import {
   Alert,
@@ -31,7 +27,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useParams } from "next/navigation";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   MdEdit,
   MdExitToApp,
@@ -40,14 +36,18 @@ import {
   MdPlayArrow,
   MdStars,
 } from "react-icons/md";
-// import TruthOrDareGame from "../../../components/menu/page";
 import { Player } from "@/types/player/player";
 import ChangePlayerNameDialog from "@/components/room/dialog/change-player-name-dialog";
 import LeaveRoomDialog from "@/components/room/dialog/exit-room-dialog";
 import GameScreen from "@/components/game/page";
-import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
 import { enqueueSnackbar } from "notistack";
-import { CommonAPIErrors, RoomErrors } from "@/api/common/types/common-errors";
+import {
+  CommonAPIErrors,
+  PlayerErrors,
+  RoomErrors,
+} from "@/api/common/types/common-errors";
+import { signalRMethods, useGameStore } from "@/lib/signalr-connection";
+import { Event } from "@/types/event/event";
 
 type RequestChangePlayerName = {
   playerId?: string;
@@ -57,45 +57,40 @@ type RequestChangePlayerName = {
 
 const RoomPage = () => {
   const params = useParams();
-  const roomId = params?.id;
-  // const router = useRouter();
+  const roomId = params?.id as string;
+  const connection = useGameStore((state) => state.connection);
   const [gameStarted, setGameStarted] = useState(false);
-  // const [timeLeft, setTimeLeft] = useState(30);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [gameEndDialogOpen, setGameEndDialogOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
 
   const playerState = getStorage("player");
+  const isCheckYourTurn = currentPlayerId === playerState?.state?.playerId;
 
-  // Xử lý đổi tên người chơi
   const [changeNameDialogOpen, setChangeNameDialogOpen] = useState(false);
   const [playerMenuAnchorEl, setPlayerMenuAnchorEl] =
     useState<null | HTMLElement>(null);
-
   const [selectedPlayer, setSelectedPlayer] = useState<RequestChangePlayerName>(
-    {
-      playerId: "",
-      roomId: "",
-      playerName: "",
-    }
+    {}
   );
 
-  const { startRoomAsync } = useStartGamePatchMutation(roomId as string);
-
-  const { resetRoomAsync } = useResetGamePatchMutation(roomId as string);
+  const { room, roomLoading, roomRefetch } = useGetRoomByIdReactQuery(
+    roomId,
+    !!roomId
+  );
 
   const handlePlayerMenuClick = (
     event: React.MouseEvent<HTMLElement>,
     player: Player
   ) => {
     setPlayerMenuAnchorEl(event.currentTarget);
-    const requestData: RequestChangePlayerName = {
-      roomId: roomId as string,
+    setSelectedPlayer({
+      roomId,
       playerId: player.playerId,
       playerName: player.playerName,
-    };
-    setSelectedPlayer(requestData);
+    });
   };
 
   const handleClosePlayerMenu = () => {
@@ -113,13 +108,12 @@ const RoomPage = () => {
   }, []);
 
   const handleOpenExitRoomDialog = useCallback(() => {
-    const requestData: RequestChangePlayerName = {
-      roomId: roomId as string,
+    setExitDialogOpen(true);
+    setSelectedPlayer({
+      roomId,
       playerId: playerState?.state?.playerId,
       playerName: playerState?.state?.playerName,
-    };
-    setExitDialogOpen(true);
-    setSelectedPlayer(requestData);
+    });
   }, [playerState?.state?.playerId, playerState?.state?.playerName, roomId]);
 
   const handleCloseExitRoomDialog = useCallback(() => {
@@ -127,51 +121,58 @@ const RoomPage = () => {
     setSelectedPlayer({});
   }, []);
 
-  const { room, roomLoading } = useGetRoomByIdReactQuery(
-    roomId as string,
-    !!roomId
-  );
-
-  const playerHost = room?.players?.find((player) => player.isHost);
-
-  const checkHost = playerHost?.playerId === playerState?.state?.playerId;
-
-  // Timer effect
-  // useEffect(() => {
-  //   let timer: NodeJS.Timeout;
-
-  //   if (gameStarted && timeLeft > 0) {
-  //     timer = setTimeout(() => {
-  //       setTimeLeft(timeLeft - 1);
-  //     }, 1000);
-  //   } else if (gameStarted && timeLeft === 0) {
-  //     // Move to next question or end game
-  //     if (questionIndex < questions.length - 1) {
-  //       setQuestionIndex(questionIndex + 1);
-  //       setCurrentQuestion(questions[questionIndex + 1].text);
-  //       setTimeLeft(30);
-  //       showSnackbar("Câu hỏi tiếp theo!");
-  //     } else {
-  //       setGameStarted(false);
-  //       setGameEndDialogOpen(true);
-  //     }
-  //   }
-
-  //   return () => {
-  //     if (timer) clearTimeout(timer);
-  //   };
-  // }, [gameStarted, timeLeft, questionIndex, questions]);
-
-  const startGame = useCallback(async () => {
-    try {
-      const { data, status } = await startRoomAsync({
-        playerId: playerState?.state?.playerId,
-      });
-      if (data?.message && status === HTTP_CODES_ENUM.OK) {
-        setGameStarted(true);
-        // setTimeLeft(30);
-        showSnackbar("Trò chơi bắt đầu!");
+  const reconnectPlayerSignalR = useCallback(async () => {
+    if (
+      connection &&
+      roomId &&
+      playerState?.state?.playerId &&
+      playerState?.state?.playerName
+    ) {
+      try {
+        await signalRMethods.reconnectPlayer(
+          connection,
+          roomId,
+          playerState.state.playerId,
+          playerState.state.playerName
+        );
+      } catch (error) {
+        console.error("Error reconnecting player:", error);
+        enqueueSnackbar({
+          variant: "error",
+          message: "Không thể kết nối lại người chơi.",
+        });
       }
+    }
+  }, [
+    connection,
+    roomId,
+    playerState?.state?.playerId,
+    playerState?.state?.playerName,
+  ]);
+
+  const handleStartGame = useCallback(async () => {
+    if (!connection) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Connection not established. Please refresh the page.",
+      });
+      return;
+    }
+
+    if (!roomId || !playerState?.state?.playerId) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Room ID and player ID are required.",
+      });
+      return;
+    }
+
+    try {
+      await signalRMethods.startGame(
+        connection,
+        roomId,
+        playerState.state.playerId
+      );
     } catch (error) {
       const customError = error as CommonAPIErrors;
       if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
@@ -192,21 +193,32 @@ const RoomPage = () => {
           message: "Không thể bắt đầu trò chơi",
         });
       }
-      console.error("Error starting game:", error);
     }
-  }, [playerState?.state?.playerId, startRoomAsync]);
+  }, [connection, roomId, playerState?.state?.playerId]);
 
-  const continueGame = useCallback(async () => {
-    try {
-      const { data, status } = await resetRoomAsync({
-        playerId: playerState?.state?.playerId,
+  const handleContinueGame = useCallback(async () => {
+    if (!connection) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Connection not established. Please refresh the page.",
       });
-      if (data?.message && status === HTTP_CODES_ENUM.OK) {
-        setGameEndDialogOpen(false);
-        // setTimeLeft(30);
-        setGameStarted(false);
-        showSnackbar("Bắt đầu lại trò chơi!");
-      }
+      return;
+    }
+
+    if (!roomId || !playerState?.state?.playerId) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Room ID and player ID are required.",
+      });
+      return;
+    }
+
+    try {
+      await signalRMethods.resetGame(
+        connection,
+        roomId,
+        playerState.state.playerId
+      );
     } catch (error) {
       const customError = error as CommonAPIErrors;
       if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
@@ -220,15 +232,124 @@ const RoomPage = () => {
           message: "Không thể bắt đầu lại trò chơi",
         });
       }
-      console.error("Error reseting game:", error);
     }
-  }, [playerState?.state?.playerId, resetRoomAsync]);
+  }, [connection, roomId, playerState?.state?.playerId]);
+
+  useEffect(() => {
+    connection?.on(Event.GameReset, () => {
+      setGameEndDialogOpen(false);
+      setGameStarted(false);
+      setCurrentPlayerId(null);
+      showSnackbar("Bắt đầu lại trò chơi!");
+    });
+    return () => {
+      connection?.off(Event.GameReset);
+    };
+  }, [connection]);
 
   const showSnackbar = (message: string) => {
     setSnackbarMessage(message);
     setSnackbarOpen(true);
   };
 
+  useEffect(() => {
+    reconnectPlayerSignalR();
+  }, [reconnectPlayerSignalR]);
+
+  useEffect(() => {
+    connection?.on(Event.PlayerJoined, (playerName: string) => {
+      enqueueSnackbar({
+        message: `Người chơi ${playerName} đã vào phòng`,
+        variant: "info",
+      });
+      roomRefetch();
+    });
+
+    connection?.on(Event.PlayerListUpdated, (players: Player[]) => {
+      console.log(`Danh sách người chơi: ${players}`);
+      roomRefetch();
+    });
+
+    connection?.on(Event.StartGameSuccess, (result) => {
+      console.log("Bắt đầu trò chơi thành công: ", result);
+      setGameStarted(true);
+      showSnackbar("Trò chơi bắt đầu!");
+    });
+
+    connection?.on(Event.GameStarted, (result) => {
+      enqueueSnackbar({
+        message: `Game started: ${result.message}`,
+        variant: "info",
+      });
+      setGameStarted(true);
+      setCurrentPlayerId(result.currentPlayerId);
+    });
+
+    connection?.on(Event.NextPlayerTurn, (result) => {
+      console.log(
+        `Current Player: ${result.nextPlayerName} (${result.nextPlayerId})`
+      );
+      setCurrentPlayerId(result.nextPlayerId);
+      enqueueSnackbar({
+        variant: "info",
+        message: `Lượt của ${result.nextPlayerName}`,
+      });
+    });
+
+    return () => {
+      connection?.off(Event.PlayerJoined);
+      connection?.off(Event.PlayerListUpdated);
+      connection?.off(Event.StartGameSuccess);
+      connection?.off(Event.GameStarted);
+      connection?.off(Event.NextPlayerTurn);
+    };
+  }, [connection, roomRefetch]);
+
+  const handleFailed = useCallback((error: CommonAPIErrors) => {
+    const customError = error as CommonAPIErrors;
+    if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Bạn không phải là chủ phòng",
+      });
+    } else if (
+      customError?.errors?.errorCode === PlayerErrors.PlayerIdNotFound
+    ) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Người chơi không tồn tại",
+      });
+    } else if (
+      customError?.errors?.errorCode === PlayerErrors.PlayerNameExisted
+    ) {
+      enqueueSnackbar({
+        message: "Tên người chơi đã tồn tại",
+        variant: "error",
+      });
+    } else if (
+      customError?.errors?.errorCode === PlayerErrors.PlayerNameLength
+    ) {
+      enqueueSnackbar({
+        message: "Tên người chơi không được quá 50 ký tự",
+        variant: "error",
+      });
+    } else {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Đã có lỗi xảy ra",
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    connection?.on(Event.OperationFailed, handleFailed);
+    return () => {
+      connection?.off(Event.OperationFailed);
+    };
+  }, [connection, handleFailed]);
+
+  const playerHost = room?.players?.find((player) => player.isHost);
+  const checkHost = playerHost?.playerId === playerState?.state?.playerId;
   const playerList = room?.players?.filter((player) => player.isActive);
 
   return (
@@ -274,7 +395,6 @@ const RoomPage = () => {
               gap: 3,
             }}
           >
-            {/* Players list */}
             <Paper
               sx={{
                 p: 3,
@@ -284,7 +404,7 @@ const RoomPage = () => {
               }}
             >
               <Typography variant="h6" sx={{ mb: 2 }}>
-                Người chơi ({room?.players?.length})
+                Người chơi ({playerList?.length || 0})
               </Typography>
               <List sx={{ bgcolor: "background.paper", borderRadius: 2 }}>
                 {playerList?.map((player, index) => (
@@ -292,7 +412,7 @@ const RoomPage = () => {
                     <ListItem
                       className="flex-wrap gap-2"
                       secondaryAction={
-                        player.playerName === playerState.state.playerName && (
+                        player.playerId === playerState?.state?.playerId && (
                           <Tooltip title="Tùy chọn">
                             <IconButton
                               edge="end"
@@ -306,7 +426,7 @@ const RoomPage = () => {
                       }
                     >
                       <ListItemAvatar className="flex justify-center items-center gap-2">
-                        {player.playerId === playerState.state.playerId && (
+                        {player.playerId === playerState?.state?.playerId && (
                           <Chip label="Bạn" size="small" color="primary" />
                         )}
                         <Avatar className="player-avatar">
@@ -321,6 +441,14 @@ const RoomPage = () => {
                         }}
                       >
                         {player.playerName}
+                        {player.playerId === currentPlayerId && (
+                          <Chip
+                            label="Lượt hiện tại"
+                            size="small"
+                            color="success"
+                            sx={{ ml: 1 }}
+                          />
+                        )}
                       </Box>
                       {player.isHost && (
                         <IconButton edge="end" size="medium" color="warning">
@@ -328,7 +456,7 @@ const RoomPage = () => {
                         </IconButton>
                       )}
                     </ListItem>
-                    {index < room?.players?.length - 1 && (
+                    {index < (playerList?.length || 0) - 1 && (
                       <Divider variant="inset" component="li" />
                     )}
                   </Box>
@@ -336,7 +464,6 @@ const RoomPage = () => {
               </List>
             </Paper>
 
-            {/* Game area */}
             <Paper
               sx={{
                 p: 3,
@@ -366,7 +493,7 @@ const RoomPage = () => {
                       variant="contained"
                       size="large"
                       startIcon={<MdPlayArrow />}
-                      onClick={startGame}
+                      onClick={handleStartGame}
                       sx={{ py: 1.5, px: 4 }}
                     >
                       Bắt đầu
@@ -374,62 +501,14 @@ const RoomPage = () => {
                   )}
                 </Box>
               ) : (
-                // <Box sx={{ textAlign: "center" }}>
-                //   {/* <Box
-                //     sx={{
-                //       display: "flex",
-                //       justifyContent: "center",
-                //       alignItems: "center",
-                //       mb: 3,
-                //     }}
-                //   >
-                //     <MdAccessTime className="mr-1" />
-                //     <Typography variant="h6" component="span">
-                //       Thời gian còn lại:
-                //     </Typography>
-                //     <Typography
-                //       variant="h6"
-                //       component="span"
-                //       sx={{
-                //         ml: 1,
-                //         color: timeLeft <= 10 ? "error.main" : "inherit",
-                //         fontWeight: "bold",
-                //       }}
-                //     >
-                //       {timeLeft}s
-                //     </Typography>
-                //   </Box> */}
-
-                //   <Box className="question-card">
-                //     <Typography className="question-text">
-                //       {currentQuestion}
-                //     </Typography>
-                //     {checkHost && (
-                //       <Button
-                //         variant="outlined"
-                //         startIcon={<MdRefresh />}
-                //         onClick={() => {
-                //           if (questionIndex < questions.length - 1) {
-                //             setQuestionIndex(questionIndex + 1);
-                //             setCurrentQuestion(
-                //               questions[questionIndex + 1].text
-                //             );
-                //             // setTimeLeft(30);
-                //             showSnackbar("Đã chuyển câu hỏi!");
-                //           }
-                //         }}
-                //       >
-                //         Câu hỏi tiếp theo
-                //       </Button>
-                //     )}
-                //   </Box>
-                // </Box>
                 <GameScreen
                   mode={room?.mode}
-                  players={room?.players}
-                  roomId={roomId as string}
+                  players={room?.players || []}
+                  roomId={roomId}
                   setGameEndDialogOpen={setGameEndDialogOpen}
-                  currentPlayerIdTurn={room?.currentPlayerIdTurn}
+                  currentPlayerIdTurn={currentPlayerId}
+                  isCheckYourTurn={isCheckYourTurn}
+                  setCurrentPlayerIdTurn={setCurrentPlayerId}
                 />
               )}
             </Paper>
@@ -437,14 +516,12 @@ const RoomPage = () => {
         </>
       )}
 
-      {/* Exit Room Dialog */}
       <LeaveRoomDialog
         open={exitDialogOpen}
         onClose={handleCloseExitRoomDialog}
         requestData={selectedPlayer}
       />
 
-      {/* Game End Dialog */}
       <Dialog
         open={gameEndDialogOpen}
         onClose={() => setGameEndDialogOpen(false)}
@@ -464,14 +541,17 @@ const RoomPage = () => {
             Kết thúc
           </Button>
           {checkHost && (
-            <Button onClick={continueGame} variant="contained" color="primary">
+            <Button
+              onClick={handleContinueGame}
+              variant="contained"
+              color="primary"
+            >
               Chơi lại
             </Button>
           )}
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={3000}
