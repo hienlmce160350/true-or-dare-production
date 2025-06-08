@@ -8,6 +8,7 @@ import SnackbarProvider from "@/components/snackbar/snackbar-provider";
 import { SettingsThemeValueProps } from "@/components/settings/types";
 import { SettingsProvider } from "@/components/settings/context/settings-provider";
 import GuidInitializer from "@/components/guid-initializer/page";
+import SignalRProvider from "@/components/hook-form/signalr-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,6 +41,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Get the SignalR server URL from environment variables
+  const signalRUrl =
+    process.env.NEXT_PUBLIC_HOST_API || "https://your-signalr-server.com";
   return (
     <html lang="en">
       <body
@@ -48,34 +52,36 @@ export default function RootLayout({
         <QueryProvider>
           <ReactQueryDevtools initialIsOpen={false} />
           <SettingsProvider defaultSettings={defaultSettings}>
-            <SnackbarProvider>
-              <GuidInitializer /> {/* Khởi tạo GUID trên mọi trang */}
-              <div className="m-auto font-[family-name:var(--font-geist-sans)]">
-                <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-purple-800 to-blue-500 p-6">
-                  <div className="mb-8 flex flex-col items-center">
-                    <div className="relative flex items-center gap-3 text-4xl font-extrabold tracking-tighter text-white md:text-5xl lg:text-6xl">
-                      {/* Phần TRUTH */}
-                      <span className="group relative transition-all duration-300 hover:scale-110">
-                        TRUTH
-                        <LuSparkles className="absolute -right-6 -top-4 h-6 w-6 text-yellow-300 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                      </span>
-                      <span className="text-2xl font-light md:text-3xl lg:text-4xl">
-                        or
-                      </span>
-                      {/* Phần DARE */}
-                      <span className="group relative transition-all duration-300 hover:scale-110">
-                        DARE
-                        <LuZap className="absolute -right-6 -top-4 h-6 w-6 text-red-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                      </span>
+            <SignalRProvider serverUrl={signalRUrl}>
+              <SnackbarProvider>
+                <GuidInitializer /> {/* Khởi tạo GUID trên mọi trang */}
+                <div className="m-auto font-[family-name:var(--font-geist-sans)]">
+                  <div className="flex min-h-screen w-full flex-col items-center justify-center bg-gradient-to-br from-purple-800 to-blue-500 p-6">
+                    <div className="mb-8 flex flex-col items-center">
+                      <div className="relative flex items-center gap-3 text-4xl font-extrabold tracking-tighter text-white md:text-5xl lg:text-6xl">
+                        {/* Phần TRUTH */}
+                        <span className="group relative transition-all duration-300 hover:scale-110">
+                          TRUTH
+                          <LuSparkles className="absolute -right-6 -top-4 h-6 w-6 text-yellow-300 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        </span>
+                        <span className="text-2xl font-light md:text-3xl lg:text-4xl">
+                          or
+                        </span>
+                        {/* Phần DARE */}
+                        <span className="group relative transition-all duration-300 hover:scale-110">
+                          DARE
+                          <LuZap className="absolute -right-6 -top-4 h-6 w-6 text-red-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        </span>
+                      </div>
+                      <p className="mt-2 text-center text-sm font-medium text-blue-100 md:text-base">
+                        The ultimate party game of choices and challenges
+                      </p>
                     </div>
-                    <p className="mt-2 text-center text-sm font-medium text-blue-100 md:text-base">
-                      The ultimate party game of choices and challenges
-                    </p>
+                    {children}
                   </div>
-                  {children}
                 </div>
-              </div>
-            </SnackbarProvider>
+              </SnackbarProvider>
+            </SignalRProvider>
           </SettingsProvider>
         </QueryProvider>
       </body>

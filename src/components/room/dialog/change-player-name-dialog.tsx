@@ -2,12 +2,11 @@ import {
   CommonAPIErrors,
   PlayerErrors,
 } from "@/api/common/types/common-errors";
-import HTTP_CODES_ENUM from "@/api/common/types/http-codes";
-import { useChangePlayerNamePostMutation } from "@/api/rooms";
 import FormProvider from "@/components/hook-form/form-provider";
 import RHFTextField from "@/components/hook-form/rhf-text-field";
 import { useCheckMobile } from "@/hooks/use-check-screen-type";
 import { setStorage } from "@/hooks/use-local-storage";
+import { signalRMethods, useGameStore } from "@/lib/signalr-connection";
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
   Box,
@@ -20,10 +19,11 @@ import {
   IconButton,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { FaTimes } from "react-icons/fa";
 import * as Yup from "yup";
+import { Event } from "@/types/event/event";
 
 type Props = {
   open: boolean;
@@ -39,10 +39,8 @@ type RequestChangePlayerName = {
 
 function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
   const { enqueueSnackbar } = useSnackbar();
-  const [shouldRefetch, setShouldRefetch] = useState(false);
-  const { changePlayerNameAsync } = useChangePlayerNamePostMutation(
-    requestData?.roomId as string
-  );
+  const [isLoading, setIsLoading] = useState(false);
+  const connection = useGameStore((state) => state.connection);
   const defaultValues = useMemo(
     () => ({
       newName: requestData.playerName as string,
@@ -51,7 +49,7 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
   );
 
   const ChangePlayerNameSchema = Yup.object().shape({
-    newName: Yup.string().trim().required("Tên phòng không được để trống"),
+    newName: Yup.string().trim().required("Tên người chơi không được để trống"),
   });
 
   const methods = useForm({
@@ -59,7 +57,7 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
     resolver: yupResolver(ChangePlayerNameSchema),
   });
 
-  const { handleSubmit, setValue, setError } = methods;
+  const { handleSubmit, setValue, setError, getValues } = methods;
 
   useEffect(() => {
     if (requestData.playerName) {
@@ -67,37 +65,68 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
     }
   }, [requestData.playerName, setValue]);
 
-  const onSubmit = handleSubmit(async (dataSubmit) => {
+  const handleChangePlayerName = async ({
+    roomId,
+    playerId,
+    newName,
+  }: {
+    roomId: string;
+    playerId: string;
+    newName: string;
+  }) => {
+    if (!connection) {
+      alert("Kết nối không thành công. Vui lòng thử lại sau.");
+      return;
+    }
+
     try {
-      setShouldRefetch(true);
-      const roomInfo = {
-        playerId: requestData.playerId,
-        newName: dataSubmit.newName.trim(),
-      };
-      const { status } = await changePlayerNameAsync(roomInfo);
-      if (status === HTTP_CODES_ENUM.OK) {
-        enqueueSnackbar({
-          message: "Đổi tên thành công",
-          variant: "success",
-        });
-        const state = {
-          state: {
-            playerId: requestData.playerId,
-            playerName: dataSubmit.newName,
-          },
-        };
-        setStorage("player", state);
-        setShouldRefetch(false);
-        onClose();
-      }
+      setIsLoading(true);
+      await signalRMethods.changePlayerName(
+        connection,
+        roomId,
+        playerId,
+        newName
+      );
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const onSubmit = handleSubmit(async (dataSubmit) => {
+    try {
+      setIsLoading(true);
+      await handleChangePlayerName({
+        roomId: requestData.roomId as string,
+        playerId: requestData.playerId as string,
+        newName: dataSubmit.newName.trim(),
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  useEffect(() => {
+    connection?.on(Event.ChangePlayerNameSuccess, () => {
+      enqueueSnackbar({
+        message: "Đổi tên thành công",
+        variant: "success",
+      });
+      const state = {
+        state: {
+          playerId: requestData.playerId,
+          playerName: getValues("newName"),
+        },
+      };
+      setStorage("player", state);
+      setIsLoading(false);
+      onClose();
+    });
+  }, [connection, enqueueSnackbar, getValues, onClose, requestData.playerId]);
+
+  const handleFailed = useCallback(
+    (error: CommonAPIErrors) => {
       const customError = error as CommonAPIErrors;
       if (customError?.errors?.errorCode === PlayerErrors.PlayerNameExisted) {
-        enqueueSnackbar({
-          message: "Tên người chơi đã tồn tại",
-          variant: "error",
-        });
         setError("newName", {
           type: "manual",
           message: "Tên người chơi đã tồn tại",
@@ -105,23 +134,23 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
       } else if (
         customError?.errors?.errorCode === PlayerErrors.PlayerNameLength
       ) {
-        enqueueSnackbar({
-          message: "Tên người chơi không được quá 50 ký tự",
-          variant: "error",
-        });
         setError("newName", {
           type: "manual",
           message: "Tên người chơi không được quá 50 ký tự",
         });
-      } else {
-        enqueueSnackbar({
-          message: "Đổi tên thất bại",
-          variant: "error",
-        });
       }
-      setShouldRefetch(false);
-    }
-  });
+
+      setIsLoading(false);
+    },
+    [setError]
+  );
+
+  useEffect(() => {
+    connection?.on(Event.OperationFailed, handleFailed);
+    return () => {
+      connection?.off(Event.OperationFailed);
+    };
+  }, [connection, handleFailed]);
 
   const sxFormControl = useMemo(
     () => ({
@@ -193,8 +222,9 @@ function ChangePlayerNameDialog({ open, onClose, requestData }: Props) {
                   },
                 }}
                 className="w-fit flex items-center gap-1"
+                disabled={isLoading}
               >
-                {shouldRefetch && (
+                {isLoading && (
                   <CircularProgress color="inherit" className="!h-5 !w-5" />
                 )}
                 Đổi tên

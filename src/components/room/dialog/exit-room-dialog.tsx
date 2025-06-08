@@ -1,4 +1,5 @@
-import { useLeaveRoomPatchMutation } from "@/api/rooms";
+"use client";
+
 import { useCheckMobile } from "@/hooks/use-check-screen-type";
 import {
   Button,
@@ -10,8 +11,9 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "notistack";
-import { memo, useCallback, useEffect, useState } from "react";
-
+import { memo, useCallback, useEffect } from "react";
+import { signalRMethods, useGameStore } from "@/lib/signalr-connection";
+import { Event } from "@/types/event/event";
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -27,22 +29,43 @@ type RequestChangePlayerName = {
 function LeaveRoomDialog({ open, onClose, requestData }: Props) {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
-  const [shouldRefetch, setShouldRefetch] = useState(false);
-  const { leaveRoom, leaveRoomSuccess, leaveRoomError } =
-    useLeaveRoomPatchMutation(requestData?.roomId as string);
+  const connection = useGameStore((state) => state.connection);
 
-  const onSubmit = useCallback(() => {
+  const handleLeaveRoomSuccess = useCallback(() => {
+    enqueueSnackbar({
+      message: "Rời phòng thành công",
+      variant: "success",
+    });
+    router.push("/rooms");
+  }, [enqueueSnackbar, router]);
+
+  const handleLeaveRoom = useCallback(
+    async ({ roomId, playerId }: { roomId: string; playerId: string }) => {
+      if (!connection) {
+        alert("Kết nối không thành công. Vui lòng thử lại sau.");
+        return;
+      }
+
+      if (!roomId || !playerId) {
+        alert("Room ID và player ID là bắt buộc.");
+        return;
+      }
+
+      try {
+        await signalRMethods.leaveRoom(connection, roomId, playerId);
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    [connection]
+  );
+
+  const onSubmit = useCallback(async () => {
     try {
-      setShouldRefetch(true);
-      const roomInfo = {
-        playerId: requestData?.playerId,
-      };
-      leaveRoom(roomInfo);
-      enqueueSnackbar({
-        message: "Rời phòng thành công",
-        variant: "success",
+      await handleLeaveRoom({
+        roomId: requestData?.roomId as string,
+        playerId: requestData?.playerId as string,
       });
-      router.push("/rooms");
     } catch (error) {
       console.error(error);
       enqueueSnackbar({
@@ -50,28 +73,20 @@ function LeaveRoomDialog({ open, onClose, requestData }: Props) {
         variant: "error",
       });
     }
-  }, [enqueueSnackbar, leaveRoom, requestData?.playerId, router]);
+  }, [
+    enqueueSnackbar,
+    handleLeaveRoom,
+    requestData?.playerId,
+    requestData?.roomId,
+  ]);
 
   useEffect(() => {
-    if (leaveRoomSuccess && shouldRefetch) {
-      enqueueSnackbar({
-        message: "Rời phòng thành công",
-        variant: "success",
-      });
-      onClose();
-      setShouldRefetch(false);
-    }
-  }, [enqueueSnackbar, leaveRoomSuccess, onClose, shouldRefetch]);
+    connection?.on(Event.LeaveRoomSuccess, handleLeaveRoomSuccess);
 
-  useEffect(() => {
-    if (leaveRoomError && shouldRefetch) {
-      enqueueSnackbar({
-        message: "Rời phòng thất bại",
-        variant: "error",
-      });
-      setShouldRefetch(false);
-    }
-  }, [enqueueSnackbar, leaveRoomError, shouldRefetch]);
+    return () => {
+      connection?.off(Event.LeaveRoomSuccess);
+    };
+  }, [connection, handleLeaveRoomSuccess]);
 
   return (
     <Dialog
