@@ -114,7 +114,6 @@ export const initializeSignalRConnection = async (serverUrl: string) => {
   connectionPromise = connection
     .start()
     .then(() => {
-      console.log("SignalR Connected");
       setConnectionState(ConnectionState.Connected);
 
       // Set up event handlers

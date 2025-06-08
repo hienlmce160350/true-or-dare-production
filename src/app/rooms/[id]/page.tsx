@@ -265,20 +265,18 @@ const RoomPage = () => {
       roomRefetch();
     });
 
-    connection?.on(Event.PlayerListUpdated, (players: Player[]) => {
-      console.log(`Danh sách người chơi: ${players}`);
+    connection?.on(Event.PlayerListUpdated, () => {
       roomRefetch();
     });
 
-    connection?.on(Event.StartGameSuccess, (result) => {
-      console.log("Bắt đầu trò chơi thành công: ", result);
+    connection?.on(Event.StartGameSuccess, () => {
       setGameStarted(true);
       showSnackbar("Trò chơi bắt đầu!");
     });
 
     connection?.on(Event.GameStarted, (result) => {
       enqueueSnackbar({
-        message: `Game started: ${result.message}`,
+        message: `Trò chơi bắt đầu!`,
         variant: "info",
       });
       setGameStarted(true);
@@ -286,9 +284,6 @@ const RoomPage = () => {
     });
 
     connection?.on(Event.NextPlayerTurn, (result) => {
-      console.log(
-        `Current Player: ${result.nextPlayerName} (${result.nextPlayerId})`
-      );
       setCurrentPlayerId(result.nextPlayerId);
       enqueueSnackbar({
         variant: "info",
@@ -307,6 +302,7 @@ const RoomPage = () => {
 
   const handleFailed = useCallback((error: CommonAPIErrors) => {
     const customError = error as CommonAPIErrors;
+    console.log("customError: ", JSON.stringify(customError));
     if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
       enqueueSnackbar({
         variant: "error",
@@ -333,10 +329,22 @@ const RoomPage = () => {
         message: "Tên người chơi không được quá 50 ký tự",
         variant: "error",
       });
+    } else if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Bạn không phải là chủ phòng",
+      });
+    } else if (
+      customError?.errors?.errorCode === RoomErrors.RoomStartStatusException
+    ) {
+      enqueueSnackbar({
+        variant: "error",
+        message: "Trò chơi đã bắt đầu",
+      });
     } else {
       enqueueSnackbar({
         variant: "error",
-        message: "Đã có lỗi xảy ra",
+        message: "Đã có lỗi xảy ra, hãy liên hệ với đội ngũ hỗ trợ",
       });
     }
   }, []);

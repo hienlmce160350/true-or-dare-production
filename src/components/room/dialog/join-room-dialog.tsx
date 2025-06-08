@@ -181,6 +181,18 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
           type: "manual",
           message: "Tên người chơi không được quá 50 ký tự",
         });
+      } else if (
+        customError?.errors?.errorCode === RoomErrors.RoomHaveBeenStarted
+      ) {
+        enqueueSnackbar({
+          message: "Phòng chơi này đã bắt đầu",
+          variant: "error",
+        });
+      } else if (customError?.errors?.errorCode === PlayerErrors.FullPlayer) {
+        enqueueSnackbar({
+          message: "Phòng chơi đã đủ người",
+          variant: "error",
+        });
       } else {
         enqueueSnackbar({
           message: "Vào phòng thất bại",
@@ -248,6 +260,65 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
     }),
     []
   );
+
+  const handleFailed = useCallback(
+    (error: CommonAPIErrors) => {
+      const customError = error as CommonAPIErrors;
+      console.log("customError: ", JSON.stringify(customError));
+      if (customError?.errors?.errorCode === RoomErrors.RoomHaveBeenStarted) {
+        enqueueSnackbar({
+          message: "Phòng chơi này đã bắt đầu",
+          variant: "error",
+        });
+      } else if (customError?.errors?.errorCode === RoomErrors.RoomFull) {
+        enqueueSnackbar({
+          message: "Phòng chơi đã đủ người",
+          variant: "error",
+        });
+      } else if (
+        customError?.errors?.errorCode === RoomErrors.RoomPasswordIsWrong
+      ) {
+        enqueueSnackbar({
+          message: "Mật khẩu không đúng",
+          variant: "error",
+        });
+        setError("roomPassword", {
+          type: "manual",
+          message: "Mật khẩu không đúng",
+        });
+      } else if (
+        customError?.errors?.errorCode === PlayerErrors.PlayerNameExisted
+      ) {
+        enqueueSnackbar({
+          message: "Tên người chơi đã tồn tại",
+          variant: "error",
+        });
+        setError("playerName", {
+          type: "manual",
+          message: "Tên người chơi đã tồn tại",
+        });
+      } else if (
+        customError?.errors?.errorCode === PlayerErrors.PlayerNameLength
+      ) {
+        enqueueSnackbar({
+          message: "Tên người chơi không được quá 50 ký tự",
+          variant: "error",
+        });
+        setError("playerName", {
+          type: "manual",
+          message: "Tên người chơi không được quá 50 ký tự",
+        });
+      }
+    },
+    [enqueueSnackbar, setError]
+  );
+
+  useEffect(() => {
+    connection?.on(Event.OperationFailed, handleFailed);
+    return () => {
+      connection?.off(Event.OperationFailed);
+    };
+  }, [connection, handleFailed]);
 
   return (
     <Dialog

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import * as Yup from "yup";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -40,8 +40,6 @@ const CreateRoom = () => {
   const connectionState = useGameStore((state) => state.connectionState);
   const connection = useGameStore((state) => state.connection);
   const updateGameState = useGameStore((state) => state.updateGameState);
-  const setError = useGameStore((state) => state.setError);
-  const error = useGameStore((state) => state.error);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -81,36 +79,6 @@ const CreateRoom = () => {
     setError: setFormError,
     watch,
   } = methods;
-
-  // Reset error state when dialog opens/closes
-  useEffect(() => {
-    setError(null);
-  }, [setError]);
-
-  // Handle API errors
-  useEffect(() => {
-    if (error) {
-      if (error.errors?.errorCode === RoomErrors.RoomAlreadyExists) {
-        setFormError("roomName", {
-          type: "manual",
-          message: "Tên phòng đã tồn tại",
-        });
-        enqueueSnackbar({
-          message: "Tên phòng đã tồn tại",
-          variant: "error",
-        });
-      } else {
-        enqueueSnackbar({
-          message:
-            error.errors?.message ||
-            "Tạo phòng thất bại. Vui lòng thử lại sau.",
-          variant: "error",
-        });
-      }
-      setIsLoading(false);
-      setError(null);
-    }
-  }, [error, enqueueSnackbar, setFormError, setError]);
 
   const handleCreateRoom = async ({
     playerId,
@@ -206,7 +174,7 @@ const CreateRoom = () => {
           message: "Tên phòng đã tồn tại",
           variant: "error",
         });
-      } else {
+      } else {  
         enqueueSnackbar({
           message: "Tạo phòng thất bại",
           variant: "error",
@@ -297,6 +265,37 @@ const CreateRoom = () => {
 
     connectToSignalR();
   }, [connectionState, enqueueSnackbar]);
+
+  const handleFailed = useCallback(
+    (error: CommonAPIErrors) => {
+      const customError = error as CommonAPIErrors;
+      console.log("customError: ", JSON.stringify(customError));
+      if (customError?.errors?.errorCode === RoomErrors.RoomAlreadyExists) {
+        setFormError("roomName", {
+          type: "manual",
+          message: "Tên phòng đã tồn tại",
+        });
+        enqueueSnackbar({
+          message: "Tên phòng đã tồn tại",
+          variant: "error",
+        });
+      } else {
+        enqueueSnackbar({
+          message: "Tạo phòng thất bại",
+          variant: "error",
+        });
+      }
+      setIsLoading(false);
+    },
+    [enqueueSnackbar, setFormError]
+  );
+
+  useEffect(() => {
+    connection?.on(Event.OperationFailed, handleFailed);
+    return () => {
+      connection?.off(Event.OperationFailed);
+    };
+  }, [connection, handleFailed]);
 
   return (
     <>
