@@ -24,6 +24,8 @@ interface GameScreenProps {
   currentPlayerIdTurn?: string | null;
   isCheckYourTurn?: boolean;
   setCurrentPlayerIdTurn?: (id: string | null) => void;
+
+  isHost?: boolean;
 }
 
 interface QuestionHistory {
@@ -41,6 +43,7 @@ export default function GameScreen({
   currentPlayerIdTurn,
   isCheckYourTurn,
   setCurrentPlayerIdTurn,
+  isHost
 }: GameScreenProps) {
   const playerState = getStorage("player");
   const connection = useGameStore((state) => state.connection);
@@ -117,7 +120,7 @@ export default function GameScreen({
           roomId,
           playerState?.state?.playerId
         );
-        if (isLast) {
+        if (isLast && isHost) {
           setGameEndDialogOpen(true);
         }
       } catch (error) {
