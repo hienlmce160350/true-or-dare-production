@@ -591,10 +591,11 @@ export const signalRMethods = {
   sendMessage: async (
     connection: signalR.HubConnection,
     roomId: string,
+    playerId: string,
     message: string
   ) => {
     try {
-      await connection.invoke(Event.SendMessage, roomId, message);
+      await connection.invoke(Event.SendMessage, roomId, playerId, message);
     } catch (error) {
       console.error("Error sending message:", error);
       throw error;
