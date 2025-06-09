@@ -54,6 +54,7 @@ import JoinRoomDialog from "@/components/room/dialog/join-room-dialog";
 import { TbDoorEnter } from "react-icons/tb";
 import { motion } from "framer-motion";
 import { LuRotateCcw, LuTrophy } from "react-icons/lu";
+import GameChat from "@/components/chat/game-chat";
 
 type RequestChangePlayerName = {
   playerId?: string;
@@ -488,6 +489,12 @@ const RoomPage = () => {
         </Box>
       ) : (
         <>
+          <GameChat
+            roomName={room?.roomName || ""}
+            roomId={roomId}
+            playerId={playerState?.state?.playerId || ""}
+            playerHost={playerHost?.playerId || ""}
+          />
           <Box
             sx={{
               display: "flex",
