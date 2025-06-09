@@ -710,6 +710,7 @@ const RoomPage = () => {
                   currentPlayerIdTurn={currentPlayerId}
                   isCheckYourTurn={isCheckYourTurn}
                   setCurrentPlayerIdTurn={setCurrentPlayerId}
+                  isHost={checkHost}
                 />
               )}
             </Paper>
