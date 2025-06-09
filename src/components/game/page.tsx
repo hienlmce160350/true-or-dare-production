@@ -559,7 +559,7 @@ export default function GameScreen({
                 onClick={lastTurn}
                 disabled={isRevealing || !isCheckYourTurn}
               >
-                Lượt cuối cùng
+                Kết thúc
               </Button>
             </motion.div>
           ) : (
