@@ -157,8 +157,8 @@ const RoomPage = () => {
         await signalRMethods.reconnectPlayer(
           connection,
           roomId,
-          playerState.state.playerId,
-          playerState.state.playerName
+          playerState?.state?.playerId,
+          playerState?.state?.playerName
         );
       } catch (error) {
         console.error("Error reconnecting player:", error);
@@ -196,7 +196,7 @@ const RoomPage = () => {
       await signalRMethods.startGame(
         connection,
         roomId,
-        playerState.state.playerId
+        playerState?.state?.playerId
       );
       roomRefetch();
     } catch (error) {
@@ -220,7 +220,7 @@ const RoomPage = () => {
         });
       }
     }
-  }, [connection, roomId, playerState.state.playerId, roomRefetch]);
+  }, [connection, roomId, playerState?.state?.playerId, roomRefetch]);
 
   const handleContinueGame = useCallback(async () => {
     if (!connection) {
@@ -243,7 +243,7 @@ const RoomPage = () => {
       await signalRMethods.resetGame(
         connection,
         roomId,
-        playerState.state.playerId
+        playerState?.state?.playerId
       );
       roomRefetch();
     } catch (error) {
@@ -260,7 +260,7 @@ const RoomPage = () => {
         });
       }
     }
-  }, [connection, roomId, playerState.state.playerId, roomRefetch]);
+  }, [connection, roomId, playerState?.state?.playerId, roomRefetch]);
 
   const handleEndGame = useCallback(async () => {
     if (!connection) {
@@ -283,7 +283,7 @@ const RoomPage = () => {
       await signalRMethods.endGame(
         connection,
         roomId,
-        playerState.state.playerId
+        playerState?.state?.playerId
       );
       roomRefetch();
     } catch (error) {
@@ -300,7 +300,7 @@ const RoomPage = () => {
         });
       }
     }
-  }, [connection, roomId, playerState.state.playerId, roomRefetch]);
+  }, [connection, roomId, playerState?.state?.playerId, roomRefetch]);
 
   useEffect(() => {
     connection?.on(Event.GameReset, () => {
