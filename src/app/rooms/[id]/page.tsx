@@ -89,6 +89,10 @@ const RoomPage = () => {
     !!roomId
   );
 
+  const playerHost = room?.players?.find((player) => player.isHost);
+  const checkHost = playerHost?.playerId === playerState?.state?.playerId;
+  const playerList = room?.players?.filter((player) => player.isActive);
+
   const handlePlayerMenuClick = (
     event: React.MouseEvent<HTMLElement>,
     player: Player
@@ -373,7 +377,9 @@ const RoomPage = () => {
   useEffect(() => {
     connection?.on(Event.EndGameSuccess, () => {
       handleCloseEndGameDialog();
-      setGameEndDialogOpen(true);
+      if (checkHost) {
+        setGameEndDialogOpen(true);
+      }
       enqueueSnackbar({
         message: `Trò chơi kết thúc!`,
         variant: "success",
@@ -382,7 +388,7 @@ const RoomPage = () => {
     return () => {
       connection?.off(Event.EndGameSuccess);
     };
-  }, [connection, handleCloseEndGameDialog]);
+  }, [checkHost, connection, handleCloseEndGameDialog]);
 
   useEffect(() => {
     connection?.on(Event.GameEnded, () => {
@@ -466,10 +472,6 @@ const RoomPage = () => {
       connection?.off(Event.OperationFailed);
     };
   }, [connection, handleFailed]);
-
-  const playerHost = room?.players?.find((player) => player.isHost);
-  const checkHost = playerHost?.playerId === playerState?.state?.playerId;
-  const playerList = room?.players?.filter((player) => player.isActive);
 
   return (
     <Container maxWidth="lg">
