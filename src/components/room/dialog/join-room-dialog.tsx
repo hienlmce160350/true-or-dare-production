@@ -33,9 +33,10 @@ type Props = {
   open: boolean;
   onClose: () => void;
   room?: Room;
+  isRoomDetail?: boolean;
 };
 
-function JoinRoomDialog({ open, onClose, room }: Props) {
+function JoinRoomDialog({ open, onClose, room, isRoomDetail = false }: Props) {
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
   const connection = useGameStore((state) => state.connection);
@@ -223,7 +224,11 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
       }
       setStorage("player", state);
       setIsLoading(false);
-      router.push(`/rooms/${room?.roomId}`);
+      if (isRoomDetail) {
+        onClose();
+      } else {
+        router.push(`/rooms/${room?.roomId}`);
+      }
       enqueueSnackbar({
         message: "Vào phòng thành công",
         variant: "success",
@@ -237,6 +242,8 @@ function JoinRoomDialog({ open, onClose, room }: Props) {
     playerState?.state?.playerId,
     enqueueSnackbar,
     getValues,
+    isRoomDetail,
+    onClose,
   ]);
 
   const sxFormControl = useMemo(

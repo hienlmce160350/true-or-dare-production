@@ -50,6 +50,10 @@ import { signalRMethods, useGameStore } from "@/lib/signalr-connection";
 import { Event } from "@/types/event/event";
 import { IoStopOutline } from "react-icons/io5";
 import { RoomStatusEnum } from "@/types/room/room-status-enum";
+import JoinRoomDialog from "@/components/room/dialog/join-room-dialog";
+import { TbDoorEnter } from "react-icons/tb";
+import { motion } from "framer-motion";
+import { LuRotateCcw, LuTrophy } from "react-icons/lu";
 
 type RequestChangePlayerName = {
   playerId?: string;
@@ -139,6 +143,9 @@ const RoomPage = () => {
     setSelectedPlayer({});
   }, []);
 
+  // Join room dialog
+  const [joinRoomDialogOpen, setJoinRoomDialogOpen] = useState(false);
+
   const reconnectPlayerSignalR = useCallback(async () => {
     if (
       connection &&
@@ -213,7 +220,7 @@ const RoomPage = () => {
         });
       }
     }
-  }, [connection, roomId, playerState?.state?.playerId]);
+  }, [connection, roomId, playerState.state.playerId, roomRefetch]);
 
   const handleContinueGame = useCallback(async () => {
     if (!connection) {
@@ -278,6 +285,7 @@ const RoomPage = () => {
         roomId,
         playerState.state.playerId
       );
+      roomRefetch();
     } catch (error) {
       const customError = error as CommonAPIErrors;
       if (customError?.errors?.errorCode === RoomErrors.RoomRequiredHost) {
@@ -292,7 +300,7 @@ const RoomPage = () => {
         });
       }
     }
-  }, [connection, roomId, playerState?.state?.playerId]);
+  }, [connection, roomId, playerState.state.playerId, roomRefetch]);
 
   useEffect(() => {
     connection?.on(Event.GameReset, () => {
@@ -366,11 +374,41 @@ const RoomPage = () => {
     connection?.on(Event.EndGameSuccess, () => {
       handleCloseEndGameDialog();
       setGameEndDialogOpen(true);
+      enqueueSnackbar({
+        message: `Trò chơi kết thúc!`,
+        variant: "success",
+      });
     });
     return () => {
       connection?.off(Event.EndGameSuccess);
     };
   }, [connection, handleCloseEndGameDialog]);
+
+  useEffect(() => {
+    connection?.on(Event.GameEnded, () => {
+      enqueueSnackbar({
+        message: `Trò chơi kết thúc!`,
+        variant: "success",
+      });
+      roomRefetch();
+    });
+    return () => {
+      connection?.off(Event.GameEnded);
+    };
+  }, [connection, roomRefetch]);
+
+  useEffect(() => {
+    connection?.on(Event.PlayerLeft, () => {
+      enqueueSnackbar({
+        message: `Người chơi rời phòng`,
+        variant: "info",
+      });
+      roomRefetch();
+    });
+    return () => {
+      connection?.off(Event.PlayerLeft);
+    };
+  }, [connection, roomRefetch]);
 
   const handleFailed = useCallback((error: CommonAPIErrors) => {
     const customError = error as CommonAPIErrors;
@@ -387,6 +425,7 @@ const RoomPage = () => {
         variant: "error",
         message: "Người chơi không tồn tại",
       });
+      setJoinRoomDialogOpen(true);
     } else if (
       customError?.errors?.errorCode === PlayerErrors.PlayerNameExisted
     ) {
@@ -457,9 +496,23 @@ const RoomPage = () => {
           >
             <Typography className="text-white">Phòng: {roomId}</Typography>
             <div className="flex items-center gap-2">
+              {/* Button for restarting a game when the room has ended */}
+              {/* {checkHost && room?.status === RoomStatusEnum.Ended && (
+                <Button
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 !text-white font-semibold py-3 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105"
+                  variant="contained"
+                  color="inherit"
+                  startIcon={<LuRotateCcw />}
+                  onClick={handleContinueGame}
+                >
+                  Bắt đầu lại
+                </Button>
+              )} */}
+
+              {/* Button for ending a game in progress */}
               {checkHost && room?.status === RoomStatusEnum.Playing && (
                 <Button
-                  className="!text-white !border-rose-500 flex-none !bg-rose-600 border hover:!bg-rose-500"
+                  className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 !text-white font-semibold py-3 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105"
                   variant="contained"
                   color="inherit"
                   startIcon={<IoStopOutline />}
@@ -469,13 +522,30 @@ const RoomPage = () => {
                 </Button>
               )}
 
+              {/* Button for joining a room */}
+              {!room?.players?.some(
+                (player) => player.playerId === playerState?.state?.playerId
+              ) && (
+                <Button
+                  className="w-fit bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 !text-white font-semibold py-3 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105"
+                  variant="contained"
+                  color="inherit"
+                  startIcon={<TbDoorEnter />}
+                  onClick={() => {
+                    setJoinRoomDialogOpen(true);
+                  }}
+                >
+                  Tham gia
+                </Button>
+              )}
+
+              {/* Button for leaving a room */}
               <Button
-                className="!text-white !border-white flex-none"
+                className="w-fit !text-gray-200 !bg-transparent !border-gray-400 flex-none hover:!bg-gray-700 hover:!text-white hover:!border-gray-300"
                 variant="outlined"
                 color="inherit"
                 startIcon={<MdExitToApp />}
                 onClick={handleOpenExitRoomDialog}
-                sx={{ bgcolor: "rgba(255,255,255,0.1)" }}
               >
                 Rời phòng
               </Button>
@@ -567,7 +637,7 @@ const RoomPage = () => {
                 flexDirection: "column",
               }}
             >
-              {!gameStarted ? (
+              {!gameStarted && room?.status !== RoomStatusEnum.Ended ? (
                 <Box
                   sx={{
                     display: "flex",
@@ -591,6 +661,41 @@ const RoomPage = () => {
                       sx={{ py: 1.5, px: 4 }}
                     >
                       Bắt đầu
+                    </Button>
+                  )}
+                </Box>
+              ) : room?.status === RoomStatusEnum.Ended ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    py: 4,
+                  }}
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                    className="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4"
+                  >
+                    <LuTrophy className="w-10 h-10 text-white" />
+                  </motion.div>
+                  <Typography variant="h5" sx={{ mb: 3, textAlign: "center" }}>
+                    {checkHost
+                      ? "Trò chơi đã kết thúc! Bạn là chủ phòng. Bạn có muốn chơi lại không?"
+                      : "Trò chơi đã kết thúc!"}
+                  </Typography>
+                  {checkHost && (
+                    <Button
+                      className="w-fit bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 !text-white font-semibold py-3 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105"
+                      variant="contained"
+                      size="large"
+                      startIcon={<LuRotateCcw />}
+                      onClick={handleContinueGame}
+                    >
+                      Bắt đầu lại
                     </Button>
                   )}
                 </Box>
@@ -708,6 +813,16 @@ const RoomPage = () => {
         onClose={handleCloseChangeNameDialog}
         requestData={selectedPlayer}
       />
+
+      {/* Join Room Dialog */}
+      {room && joinRoomDialogOpen && (
+        <JoinRoomDialog
+          open={joinRoomDialogOpen}
+          onClose={() => setJoinRoomDialogOpen(false)}
+          room={room}
+          isRoomDetail
+        />
+      )}
     </Container>
   );
 };

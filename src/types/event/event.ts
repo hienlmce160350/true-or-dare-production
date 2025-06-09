@@ -19,6 +19,7 @@ export enum Event {
   GameEnded = "GameEnded",
   GameReset = "GameReset",
   OperationFailed = "OperationFailed",
+  PlayerLeft = "PlayerLeft",
 
   // Invoke
   CreateRoom = "CreateRoom",
