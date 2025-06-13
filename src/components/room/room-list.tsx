@@ -6,15 +6,13 @@ import { IFilterValue, IRoomFilters, Room } from "@/types/room/room";
 import {
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   CircularProgress,
   Container,
-  Divider,
   FormControl,
   IconButton,
   InputAdornment,
+  List,
+  ListItem,
   Pagination,
   Paper,
   Table,
@@ -42,6 +40,8 @@ import CreateRoomDialog from "./dialog/create-room-dialog";
 import JoinRoomDialog from "./dialog/join-room-dialog";
 import Iconify from "../iconify";
 import { RoomStatusEnum } from "@/types/room/room-status-enum";
+import ChipRoomStatus from "../chip/chip-room-status";
+import RoomDetailCard from "../card/room-detail-card";
 
 const RoomList = () => {
   const router = useRouter();
@@ -88,32 +88,6 @@ const RoomList = () => {
   const handleRoomClick = (room: Room) => {
     setSelectedRoom(room);
     setJoinRoomDialogOpen(true);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "waiting":
-        return "success";
-      case "playing":
-        return "primary";
-      case "ended":
-        return "error";
-      default:
-        return "default";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "waiting":
-        return "Đang chờ";
-      case "playing":
-        return "Đang chơi";
-      case "ended":
-        return "Kết thúc";
-      default:
-        return status;
-    }
   };
 
   // const handlePasswordSubmit = () => {
@@ -177,6 +151,19 @@ const RoomList = () => {
       "& .Mui-focused:hover": {
         borderColor: "rgba(0, 0, 0, 0.23) !important",
       },
+    }),
+    []
+  );
+
+  const memoSxList = useMemo(
+    () => ({
+      overflowY: "auto",
+      height: "100%",
+      width: "100%",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
     }),
     []
   );
@@ -265,110 +252,20 @@ const RoomList = () => {
               // Mobile view - Card list
               <Box sx={{ mb: 3 }}>
                 {paginatedRooms.length > 0 ? (
-                  paginatedRooms.map((room) => {
-                    const isFull = room.playerCount === room.maxPlayer;
-
-                    return (
-                      <Card
-                        key={room.roomId}
-                        sx={{
-                          mb: 2,
-                          borderRadius: 2,
-                          cursor: isFull ? "default" : "pointer",
-                          opacity: isFull ? 0.6 : 1,
-                          position: "relative", // Cho lớp phủ
-                          transition: "transform 0.2s",
-                          "&:hover": {
-                            transform: "translateY(-4px)",
-                            boxShadow: 4,
-                          },
-                        }}
-                        onClick={() => !isFull && handleRoomClick(room)}
-                      >
-                        <CardContent sx={{ p: 2 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              mb: 1,
-                            }}
-                          >
-                            <Typography
-                              variant="h6"
-                              noWrap
-                              sx={{ maxWidth: "70%" }}
-                            >
-                              {room.roomName}
-                            </Typography>
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              mb: 1,
-                            }}
-                          >
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                              <IoMdPeople className="mr-1 text-base" />
-                              <Typography className="text-base">
-                                {room.playerCount}/{room.maxPlayer}
-                              </Typography>
-                            </Box>
-                            <Box>
-                              {room.hasPassword ? (
-                                <MdLock className="text-base" />
-                              ) : (
-                                <MdLockOpen className="text-emerald-600 text-base" />
-                              )}
-                            </Box>
-                          </Box>
-
-                          <Divider sx={{ my: 1 }} />
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Typography variant="body2" color="text.secondary">
-                              Chủ phòng: {room.hostName}
-                            </Typography>
-                          </Box>
-                        </CardContent>
-
-                        {/* Thêm lớp phủ với nội dung "Phòng đã đầy" */}
-                        {isFull && (
-                          <Box
-                            sx={{
-                              position: "absolute",
-                              top: 0,
-                              left: 0,
-                              width: "100%",
-                              height: "100%",
-                              backgroundColor: "rgba(255, 255, 255, 0.8)",
-                              borderRadius: 2,
-                              display: "flex",
-                              justifyContent: "center",
-                              alignItems: "center",
-                              zIndex: 1,
-                            }}
-                          >
-                            <Typography
-                              variant="body1"
-                              color="error"
-                              sx={{ fontWeight: "bold" }}
-                            >
-                              Phòng đã đủ người
-                            </Typography>
-                          </Box>
-                        )}
-                      </Card>
-                    );
-                  })
+                  <List sx={memoSxList}>
+                    {paginatedRooms.map((room) => {
+                      const isFull = room.playerCount === room.maxPlayer;
+                      return (
+                        <ListItem key={room.roomId} className="!px-0">
+                          <RoomDetailCard
+                            room={room}
+                            handleRoomClick={handleRoomClick}
+                            isFull={isFull}
+                          />
+                        </ListItem>
+                      );
+                    })}
+                  </List>
                 ) : (
                   <Paper
                     sx={{
@@ -460,11 +357,7 @@ const RoomList = () => {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <Chip
-                              size="small"
-                              label={getStatusText(room.status)}
-                              color={getStatusColor(room.status)}
-                            />
+                            <ChipRoomStatus status={room.status} />
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: "flex", alignItems: "center" }}>

@@ -475,7 +475,7 @@ const RoomPage = () => {
   }, [connection, handleFailed]);
 
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="lg" className="!px-0">
       {roomLoading ? (
         <Box
           sx={{
@@ -503,8 +503,8 @@ const RoomPage = () => {
               mb: 3,
             }}
           >
-            <Typography className="text-white">Phòng: {roomId}</Typography>
-            <div className="flex items-center gap-2">
+            <Typography className="text-white flex-none">Phòng: {roomId}</Typography>
+            <div className="flex flex-col items-end gap-2 md:items-end md:flex-row">
               {/* Button for restarting a game when the room has ended */}
               {/* {checkHost && room?.status === RoomStatusEnum.Ended && (
                 <Button
@@ -521,7 +521,7 @@ const RoomPage = () => {
               {/* Button for ending a game in progress */}
               {checkHost && room?.status === RoomStatusEnum.Playing && (
                 <Button
-                  className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 !text-white font-semibold py-3 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105"
+                  className="w-fit bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 !text-white font-semibold py-3 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105"
                   variant="contained"
                   color="inherit"
                   startIcon={<IoStopOutline />}

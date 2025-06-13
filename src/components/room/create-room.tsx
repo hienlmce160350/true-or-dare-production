@@ -58,7 +58,7 @@ const CreateRoom = () => {
   );
 
   const CreateRoomSchema = Yup.object().shape({
-    roomName: Yup.string().required("Tên phòng không được để trống"),
+    roomName: Yup.string().trim().required("Tên phòng không được để trống"),
     playerName: Yup.string().nullable(),
     roomPassword: Yup.string().nullable(),
     maxPlayer: Yup.number()
@@ -150,7 +150,7 @@ const CreateRoom = () => {
       }
       const roomInfo = {
         playerId: playerState?.state?.playerId,
-        roomName: dataSubmit.roomName,
+        roomName: dataSubmit.roomName.trim(),
         playerName: dataSubmit.playerName ? dataSubmit.playerName.trim() : "",
         roomPassword: dataSubmit.roomPassword ? dataSubmit.roomPassword : "",
         maxPlayer: dataSubmit.maxPlayer ? dataSubmit.maxPlayer : 2,
@@ -174,7 +174,7 @@ const CreateRoom = () => {
           message: "Tên phòng đã tồn tại",
           variant: "error",
         });
-      } else {  
+      } else {
         enqueueSnackbar({
           message: "Tạo phòng thất bại",
           variant: "error",
