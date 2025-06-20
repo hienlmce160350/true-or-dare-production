@@ -16,6 +16,7 @@ import { FaTimes } from "react-icons/fa";
 import { cn } from "@/utils/cn";
 import { signalRMethods, useGameStore } from "@/lib/signalr-connection";
 import { useSnackbar } from "notistack";
+import { Event } from "@/types/event/event";
 
 interface ChatMessage {
   playerId: string;
@@ -102,7 +103,7 @@ export default function GameChat({
     if (!connection) return;
 
     connection.on(
-      "ReceiveMessage",
+      Event.ReceiveMessage,
       ({
         message,
         playerId,
@@ -130,7 +131,7 @@ export default function GameChat({
     );
 
     return () => {
-      connection.off("ReceiveMessage");
+      connection.off(Event.ReceiveMessage);
     };
   }, [connection, open, playerId]);
 
