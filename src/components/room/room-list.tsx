@@ -331,7 +331,7 @@ const RoomList = () => {
                         Mật khẩu
                       </TableCell>
                       <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                        Tham gia
+                        
                       </TableCell>
                     </TableRow>
                   </TableHead>

@@ -20,7 +20,8 @@ export default function CopyButton({
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
-  const copyToClipboard = async () => {
+  const copyToClipboard = async (event: React.MouseEvent) => {
+    event.stopPropagation();
     await navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     onCopied?.();
