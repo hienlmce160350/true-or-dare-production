@@ -417,6 +417,12 @@ const RoomPage = () => {
     };
   }, [connection, roomRefetch]);
 
+  useEffect(() => {
+    if (room?.status === RoomStatusEnum.Playing) {
+      setGameStarted(true);
+    }
+  }, [room?.status]);
+
   const handleFailed = useCallback((error: CommonAPIErrors) => {
     const customError = error as CommonAPIErrors;
     console.log("customError: ", JSON.stringify(customError));
@@ -503,7 +509,9 @@ const RoomPage = () => {
               mb: 3,
             }}
           >
-            <Typography className="text-white flex-none">Phòng: {roomId}</Typography>
+            <Typography className="text-white flex-none">
+              Phòng: {roomId}
+            </Typography>
             <div className="flex flex-col items-end gap-2 md:items-end md:flex-row">
               {/* Button for restarting a game when the room has ended */}
               {/* {checkHost && room?.status === RoomStatusEnum.Ended && (
