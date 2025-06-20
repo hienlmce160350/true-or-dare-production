@@ -43,7 +43,7 @@ export default function GameScreen({
   currentPlayerIdTurn,
   isCheckYourTurn,
   setCurrentPlayerIdTurn,
-  isHost
+  isHost,
 }: GameScreenProps) {
   const playerState = getStorage("player");
   const connection = useGameStore((state) => state.connection);
@@ -131,7 +131,13 @@ export default function GameScreen({
         });
       }
     },
-    [connection, playerState?.state?.playerId, roomId, setGameEndDialogOpen]
+    [
+      connection,
+      isHost,
+      playerState?.state?.playerId,
+      roomId,
+      setGameEndDialogOpen,
+    ]
   );
 
   const selectQuestionType = useCallback(
