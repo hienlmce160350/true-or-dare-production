@@ -64,7 +64,7 @@ function CreateRoomDialog({ open, onClose }: Props) {
   );
 
   const CreateRoomSchema = Yup.object().shape({
-    roomName: Yup.string().required("Tên phòng không được để trống"),
+    roomName: Yup.string().trim().required("Tên phòng không được để trống"),
     playerName: Yup.string().nullable(),
     roomPassword: Yup.string().nullable(),
     maxPlayer: Yup.number()
