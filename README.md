@@ -28,7 +28,7 @@ A modern, interactive Truth or Dare game built with Next.js 15 and TypeScript. T
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/true-or-dare-production.git
+git clone https://github.com/hienlmce160350/true-or-dare-production.git
 cd true-or-dare-production
 ```
 
